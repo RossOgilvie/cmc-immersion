@@ -5,6 +5,7 @@
     <title></title>
     <script src="https://cdn.jsdelivr.net/npm/mathjs@14.7.0/lib/browser/math.min.js"></script>
     <script src="integration_cc.js"></script>
+    <script src="thetafunction.js"></script>
     <script src="spectralg2.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/stdlib-js/math-base-special-ellipj@umd/browser.js"></script>
   </head>
@@ -39,79 +40,61 @@
       node.innerHTML += "<br />";
       node.innerHTML += "<br />";
 
-      let spec = new Spectral_Curve();
-      spec.update();
-      node.innerHTML += "unit circle integrations <br />";
-      node.innerHTML += spec.unitcircle_ints().toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += "<br />";
-      node.innerHTML += "a periods <br />";
-      node.innerHTML += spec.a_periods(0).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += spec.a_periods(1).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += "<br />";
-      node.innerHTML += "b periods <br />";
-      node.innerHTML += spec.b_periods(0).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += spec.b_periods(1).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += "<br />";
-      node.innerHTML += "F paths ints <br />";
-      node.innerHTML += spec.F_ints(0).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += spec.F_ints(1).toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += "<br />";
-      node.innerHTML += "F rho points <br />";
-      node.innerHTML += spec.F1rho.x.toString();
-      node.innerHTML += " ";
-      node.innerHTML += spec.F1rho.y.toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += spec.F2rho.x.toString();
-      node.innerHTML += " ";
-      node.innerHTML += spec.F2rho.y.toString();
-      node.innerHTML += "<br />";
-      node.innerHTML += "<br />";
+      // let spec = new Spectral_Curve();
+      // spec.update();
+      // node.innerHTML += "unit circle integrations <br />";
+      // node.innerHTML += spec.unitcircle_ints().toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += "<br />";
+      // node.innerHTML += "a periods <br />";
+      // node.innerHTML += spec.a_periods(0).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spec.a_periods(1).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += "<br />";
+      // node.innerHTML += "b periods <br />";
+      // node.innerHTML += spec.b_periods(0).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spec.b_periods(1).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += "<br />";
 
-      node.innerHTML += "Baker-Akhiezer coefficients <br />";
-      node.innerHTML += "[c_holo0, c_holo1, c_lam0, c_lam1, c_laminfty,  c_gamma0, c_gamma1] <br />";
-      let ba_coeffs0 = spec.ba_coefficients(0);
-      node.innerHTML += ba_coeffs0[0].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[1].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[2].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[3].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[4].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[5].toString() + "<br />";
-      node.innerHTML += ba_coeffs0[6].toString() + "<br />";
+      // Test RiemannTheta generator
+      node.innerHTML += "RiemannTheta lattice points (g=2, bound=1): <br />";
+      const tau_g2 = [[math.complex(0, 1), 0], [0, math.complex(0, 1)]]; // tau = i*I
+      const theta_g2 = new RiemannTheta(2, tau_g2);
+
+      const points = [];
+      for (const n of theta_g2.latticePoints(1)) {
+        points.push(n);
+      }
+      node.innerHTML += points.map(p => `[${p.join(', ')}]`).join(", ");
+      node.innerHTML += "<br />Count: " + points.length;
+      node.innerHTML += "<br /><br />";
+
+      // Test the computation at z=0 with g=1
+      // q = exp(- pi B)
+      const tau_from_nome = - math.log(0.5) / math.PI;
+      node.innerHTML += "RiemannTheta computation at z=0 with g=1 and nome q = 0.5: <br />";
+      const tau_g1 = [[math.complex(0, tau_from_nome)]]; // 1x1 matrix with entry i*0.5
+      const theta_g1 = new RiemannTheta(1, tau_g1);
+      const z_test_g1 = [math.complex(0, 0)]; // z = 0
+
+      // Compute with different bounds to show convergence
+      const bounds = [2, 3, 4, 5];
+      for (const bound of bounds) {
+        const result = theta_g1.compute(z_test_g1, bound);
+        node.innerHTML += `bound=${bound}: ${result.toString()}<br />`;
+      }
+
+      // Compare with direct sum: Theta_3 = sum q^(n^2)
+      let direct_sum_g1 = 0;
+      for (let n1 = -5; n1 <= 5; n1++) {
+          direct_sum_g1 += Math.pow(0.5, n1*n1);
+      }
+      node.innerHTML += `Direct sum (nome q = 0.5, bound=5): ${direct_sum_g1.toFixed(8)}<br />`;
+      node.innerHTML += "Wikipedia value for theta_3(q=0.5) ≈ 2.12893...<br />";
       node.innerHTML += "<br />";
-      let ba_coeffs1 = spec.ba_coefficients(1);
-      node.innerHTML += ba_coeffs1[0].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[1].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[2].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[3].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[4].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[5].toString() + "<br />";
-      node.innerHTML += ba_coeffs1[6].toString() + "<br />";
-      node.innerHTML += "<br />";
-      
-      // node.innerHTML += spectralg2.F1.lam.toString();
-      // node.innerHTML += spectralg2.F1.y.toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.F1rho.lam.toString();
-      // node.innerHTML += spectralg2.F1rho.y.toString();
-      // node.innerHTML += spectralg2.unitcircle_ints().toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.a_periods(0).toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.a_periods(1).toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.b_periods(0).toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.b_periods(1).toString();
-      // node.innerHTML += "<br />";
-      // node.innerHTML += spectralg2.F_ints(1).toString();
-      // node.innerHTML += "<br />";
     </script>
   </body>
 </html>
