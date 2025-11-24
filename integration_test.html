@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title></title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@14.7.0/lib/browser/math.min.js"></script>
+    <script src="integration_cc.js"></script>
+    <script src="spectralg2.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/stdlib-js/math-base-special-ellipj@umd/browser.js"></script>
+  </head>
+  <body>
+    <div id="answer"></div>
+    <script>
+      f_example = function (x) {
+        return math.exp(x)+1;
+      }
+
+      xs = cc_interval_points(0,1,3);
+      f_example_samples = new Array(xs.length);
+      for (n = 0; n < xs.length; n++)
+      {
+        f_example_samples[n] = f_example(xs[n]);
+      }
+      let f_inted = cc_int_sample(f_example_samples,0,1,3)
+
+      var node = document.getElementById('answer');
+      node.innerHTML += "int f approx <br />";
+      node.innerHTML += (f_inted-math.exp(1)).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+
+      let hyp = new Hyperelliptic_Curve();
+      hyp.update();
+      let ucp = new UnitCirclePath(hyp,5);
+      node.innerHTML += "unit circle points <br />";
+      node.innerHTML += ucp.xs.toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += ucp.ys.toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+
+      let spec = new Spectral_Curve();
+      spec.update();
+      node.innerHTML += "unit circle integrations <br />";
+      node.innerHTML += spec.unitcircle_ints().toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+      node.innerHTML += "a periods <br />";
+      node.innerHTML += spec.a_periods(0).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += spec.a_periods(1).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+      node.innerHTML += "b periods <br />";
+      node.innerHTML += spec.b_periods(0).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += spec.b_periods(1).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+      node.innerHTML += "F paths ints <br />";
+      node.innerHTML += spec.F_ints(0).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += spec.F_ints(1).toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+      node.innerHTML += "F rho points <br />";
+      node.innerHTML += spec.F1rho.x.toString();
+      node.innerHTML += " ";
+      node.innerHTML += spec.F1rho.y.toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += spec.F2rho.x.toString();
+      node.innerHTML += " ";
+      node.innerHTML += spec.F2rho.y.toString();
+      node.innerHTML += "<br />";
+      node.innerHTML += "<br />";
+
+      node.innerHTML += "Baker-Akhiezer coefficients <br />";
+      node.innerHTML += "[c_holo0, c_holo1, c_lam0, c_lam1, c_laminfty,  c_gamma0, c_gamma1] <br />";
+      let ba_coeffs0 = spec.ba_coefficients(0);
+      node.innerHTML += ba_coeffs0[0].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[1].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[2].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[3].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[4].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[5].toString() + "<br />";
+      node.innerHTML += ba_coeffs0[6].toString() + "<br />";
+      node.innerHTML += "<br />";
+      let ba_coeffs1 = spec.ba_coefficients(1);
+      node.innerHTML += ba_coeffs1[0].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[1].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[2].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[3].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[4].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[5].toString() + "<br />";
+      node.innerHTML += ba_coeffs1[6].toString() + "<br />";
+      node.innerHTML += "<br />";
+      
+      // node.innerHTML += spectralg2.F1.lam.toString();
+      // node.innerHTML += spectralg2.F1.y.toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.F1rho.lam.toString();
+      // node.innerHTML += spectralg2.F1rho.y.toString();
+      // node.innerHTML += spectralg2.unitcircle_ints().toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.a_periods(0).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.a_periods(1).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.b_periods(0).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.b_periods(1).toString();
+      // node.innerHTML += "<br />";
+      // node.innerHTML += spectralg2.F_ints(1).toString();
+      // node.innerHTML += "<br />";
+    </script>
+  </body>
+</html>
