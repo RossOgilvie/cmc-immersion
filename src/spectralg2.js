@@ -1,4 +1,4 @@
-var props = {
+let props = {
     r1: 0.5,
     r2: 0.3,
     phi: math.PI / 4,
@@ -521,5 +521,5 @@ class MeroDiff extends Differential {
   }
 }
 
-// var spectralg2 = new Spectral_Curve();
+// let spectralg2 = new Spectral_Curve();
 // spectralg2.update();
