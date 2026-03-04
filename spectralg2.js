@@ -151,15 +151,9 @@ class Spectral_Curve {
         let holo0 = new HoloDiff(this.hyp, 0);
         let holo1 = new HoloDiff(this.hyp, 1);
         this.differentials.push(holo0, holo1);
-
-        let lamtilde0 = new LambdatildeDiff(this.hyp, 0);
-        let lamtilde1 = new LambdatildeDiff(this.hyp, 1);
-        let laminfty = new LambdaInftyDiff(this.hyp);
-        this.differentials.push(lamtilde0, lamtilde1, laminfty);  
-
-        let gamma1 = new GammaDiff(this.hyp, this.F1rho);  
-        let gamma2 = new GammaDiff(this.hyp, this.F2rho);  
-        this.differentials.push(gamma1, gamma2);
+        let mero0 = new MeroDiff(this.hyp, [1,0,0,1]);
+        let mero1 = new MeroDiff(this.hyp, [math.complex(0,1),0,0,math.complex(0,-1)]);
+        this.differentials.push(mero0, mero1);
 
         // This was a test, manually calculated the semi-normalized differentials to the homology
         // const apers0 = this.a_periods(0);
@@ -234,64 +228,64 @@ class Spectral_Curve {
     // Solve for Baker-Akhiezer function coefficients
     // Returns [c_holo0, c_holo1, c_lam0, c_lam1, c_laminfty,  c_gamma0, c_gamma1, X_0]
     // where the BA differential is: sum of these coefficients times their respective differentials
-    ba_coefficients(idx) {
-        // We do a cludge that the index 0, 1 happens to be the value at the sym point
-        const X0 = idx;
+    // ba_coefficients(idx) {
+    //     // We do a cludge that the index 0, 1 happens to be the value at the sym point
+    //     const X0 = idx;
 
-        // Collect all period integrals
-        const a0_pers = this.a_periods(0);
-        const a1_pers = this.a_periods(1);
-        const b0_pers = this.b_periods(0);
-        const b1_pers = this.b_periods(1);
+    //     // Collect all period integrals
+    //     const a0_pers = this.a_periods(0);
+    //     const a1_pers = this.a_periods(1);
+    //     const b0_pers = this.b_periods(0);
+    //     const b1_pers = this.b_periods(1);
 
-        // Integrals along F-paths (root constraints)
-        const f1_ints = this.F_ints(0);
-        const f2_ints = this.F_ints(1);
+    //     // Integrals along F-paths (root constraints)
+    //     const f1_ints = this.F_ints(0);
+    //     const f2_ints = this.F_ints(1);
 
-        // mirror sym point path integral (the unit circle integral starting from top sheet)
-        const invol_ints = this.unitcircle_ints();
+    //     // mirror sym point path integral (the unit circle integral starting from top sheet)
+    //     const invol_ints = this.unitcircle_ints();
 
-        // Build 7×7 coefficient matrix A and 7×1 RHS vector b
-        // Unknowns: [c_holo0, c_holo1, c_lam0, c_lam1, c_laminfty,  c_gamma0, c_gamma1]
-        //
-        // Constraints:
-        // 1. a0 period = 0
-        // 2. a1 period = 0
-        // 3. b0 period = 0
-        // 4. b1 period = 0
-        // 5. X at F1 = 0 (integral_to_F1 = - X_0)
-        // 6. X at F2 = 0 (integral_to_F2 = - X_0)
-        // 7. X at mirror sym point = 1-idx (integral_to_MSP = 1-X0 - X0)
-        //
-        // Again we use the cludge that idx 0,1 should have 1,0 at the mirror of the sym point.
+    //     // Build 7×7 coefficient matrix A and 7×1 RHS vector b
+    //     // Unknowns: [c_holo0, c_holo1, c_lam0, c_lam1, c_laminfty,  c_gamma0, c_gamma1]
+    //     //
+    //     // Constraints:
+    //     // 1. a0 period = 0
+    //     // 2. a1 period = 0
+    //     // 3. b0 period = 0
+    //     // 4. b1 period = 0
+    //     // 5. X at F1 = 0 (integral_to_F1 = - X_0)
+    //     // 6. X at F2 = 0 (integral_to_F2 = - X_0)
+    //     // 7. X at mirror sym point = 1-idx (integral_to_MSP = 1-X0 - X0)
+    //     //
+    //     // Again we use the cludge that idx 0,1 should have 1,0 at the mirror of the sym point.
 
 
-        const rows = [
-            // Row 0: a0 period constraint
-            a0_pers,
-            // Row 1: a1 period constraint
-            a1_pers,
-            // Row 2: b0 period constraint
-            b0_pers,
-            // Row 3: b1 period constraint
-            b1_pers,
-            // Row 4: F1 root constraint
-            f1_ints,
-            // Row 5: F2 root constraint
-            f2_ints,
-            // Row 6: X at mirror sym point
-            invol_ints
-        ];
+    //     const rows = [
+    //         // Row 0: a0 period constraint
+    //         a0_pers,
+    //         // Row 1: a1 period constraint
+    //         a1_pers,
+    //         // Row 2: b0 period constraint
+    //         b0_pers,
+    //         // Row 3: b1 period constraint
+    //         b1_pers,
+    //         // Row 4: F1 root constraint
+    //         f1_ints,
+    //         // Row 5: F2 root constraint
+    //         f2_ints,
+    //         // Row 6: X at mirror sym point
+    //         invol_ints
+    //     ];
 
-        const A = math.matrix(rows);
-        const rhs = math.matrix([[0], [0], [0], [0], [-X0], [-X0], [1-(2*idx)]]);
+    //     const A = math.matrix(rows);
+    //     const rhs = math.matrix([[0], [0], [0], [0], [-X0], [-X0], [1-(2*idx)]]);
 
-        // Solve the linear system A * x = rhs
-        const solution = math.lusolve(A, rhs);
+    //     // Solve the linear system A * x = rhs
+    //     const solution = math.lusolve(A, rhs);
 
-        // Extract the solution vector and convert to array
-        return math.flatten(solution).toArray();
-    }
+    //     // Extract the solution vector and convert to array
+    //     return math.flatten(solution).toArray();
+    // }
 }
 
 
@@ -524,57 +518,6 @@ class MeroDiff extends Differential {
   }
   eval(x, y) {
     return math.divide(poly_coeff(this.bs, x),x);
-  }
-}
-
-// The Lambda diff has a double pole no reside at a branch point.
-// We subtract off an exact differential with this same pole (and necessarily some poles at infinity), so be able to integrate through the branch point.
-// The exact differential doesn't change its periods, but it does affect open paths.
-class LambdatildeDiff extends Differential {
-  root_idx;
-  constructor(hyp, root_idx) {
-    super(hyp);
-    this.root_idx = root_idx;
-  }
-  eval(x, y) {
-    const alpha = this.hyp.roots[this.root_idx];
-    const factor = math.multiply(alpha, this.hyp.a_poly_prime(alpha));
-    return math.chain(this.hyp.a_poly_hat(this.root_idx, x)).subtract(this.hyp.a_poly_prime(x)).divide(factor).done();
-  }
-
-  exact(pt) {
-    const alpha = this.hyp.roots[this.root_idx];
-    const x_diff = math.subtract(pt.x, alpha)
-    const factor = math.multiply(alpha, this.hyp.a_poly_prime(alpha));
-    return math.chain(pt.y).divide(x_diff).divide(factor).multiply(2).done();
-  }
-}
-
-// The Lambda diff has a double pole no reside at a branch point.
-// This one has it at the branch point x=\infty !
-class LambdaInftyDiff extends Differential {
-  constructor(hyp) {
-    super(hyp);
-  }
-  eval(x, y) {
-    return math.pow(x,2);
-  }
-}
-
-// The Gamma differential has a double pole no residue at pt_pole
-class GammaDiff extends Differential {
-  pt_pole;
-  constructor(hyp, pt_pole) {
-    super(hyp);
-    this.pt_pole = pt_pole;
-  }
-  eval(x, y) {
-    const x0 = this.pt_pole.x;
-    const y0 = this.pt_pole.y;
-    const x_diff = math.subtract(x, x0)
-    const term1 = math.divide(math.add(y, y0), math.pow(x_diff, 2))
-    const term2 = math.chain(0.5).divide(y0).multiply(this.hyp.a_poly_prime(x0)).divide(x_diff).done();
-    return math.add(term1, term2);
   }
 }
 
