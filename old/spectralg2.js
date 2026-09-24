@@ -104,15 +104,15 @@ class Hyperelliptic_Curve {
 class Spectral_Curve {
     hyp;
 
-    F1;
-    F2;
-    F1rho;
-    F2rho;
+    // F1;
+    // F2;
+    // F1rho;
+    // F2rho;
 
     root_paths_top;
     root_paths_bottom;
     unitcircle_path;
-    F_paths;
+    // F_paths;
     differentials;
 
     update() {
@@ -134,16 +134,16 @@ class Spectral_Curve {
         // This will be the future location of a root of the BA function. The rho of this point is a pole of the BA function.
         // The sheets are important.  Start at 1 on the upper sheet. Then go out along a straight line in the x plane to a point in the spectral curve. Call this Fi
         let one = math.complex(1,0);
-        let F1x = math.complex({ r: (props.r1/2), phi: (props.phi / 2) })
-        let F1_path = new OpenPath(this.hyp, one, F1x, true);
-        this.F1 = F1_path.lift_endPoint();
-        this.F1rho = rho(this.F1);
+        // let F1x = math.complex({ r: (props.r1/2), phi: (props.phi / 2) })
+        // let F1_path = new OpenPath(this.hyp, one, F1x, true);
+        // this.F1 = F1_path.lift_endPoint();
+        // this.F1rho = rho(this.F1);
 
-        let F2x = math.complex({ r: (props.r2/2), phi: (-props.phi / 2) })
-        let F2_path = new OpenPath(this.hyp, one, F2x, true);
-        this.F2 = F2_path.lift_endPoint();
-        this.F2rho = rho(this.F2);
-        this.F_paths = [F1_path, F2_path];
+        // let F2x = math.complex({ r: (props.r2/2), phi: (-props.phi / 2) })
+        // let F2_path = new OpenPath(this.hyp, one, F2x, true);
+        // this.F2 = F2_path.lift_endPoint();
+        // this.F2rho = rho(this.F2);
+        // this.F_paths = [F1_path, F2_path];
 
         // Now we define the differentials
         this.differentials = [];
