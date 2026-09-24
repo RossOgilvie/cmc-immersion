@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CMC Surfaces from Spectral Data</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --paper: #f5f0e4; --paper2: #ece5d3; --ink: #2b2620; --rule: #cdc2a8; --accent: #a4472a;
+    --divisor: #2f5f9e; --disc: rgba(43, 38, 32, 0.035); --muted: #6d6456;
+  }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper); color: var(--ink); display: flex; overflow: hidden;
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+  }
+  #stage { flex: 1 1 auto; position: relative; min-width: 0; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #view:active { cursor: grabbing; }
+  #status {
+    position: absolute; top: 10px; left: 14px; right: 14px; font-size: 12.5px; font-style: italic;
+    color: var(--muted); pointer-events: none; white-space: pre-wrap;
+  }
+  #status.err { color: #8c2f19; font-style: normal; }
+  #busy {
+    position: absolute; top: 12px; right: 14px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); opacity: 0; transition: opacity .2s;
+  }
+  #busy.on { opacity: 0.8; animation: pulse 0.9s ease-in-out infinite alternate; }
+  @keyframes pulse { from { transform: scale(0.6); } to { transform: scale(1); } }
+  #keys {
+    position: absolute; left: 14px; bottom: 10px; font-size: 12px; font-style: italic; color: var(--muted);
+    pointer-events: none;
+  }
+  #panel {
+    flex: 0 0 340px; height: 100%; overflow-y: auto; box-sizing: border-box; padding: 16px 18px 40px;
+    border-left: 1px solid var(--rule); font-size: 13.5px; line-height: 1.45;
+    background: linear-gradient(90deg, var(--paper2), var(--paper) 14px);
+  }
+  h1 { font-size: 17px; font-weight: normal; font-variant: small-caps; letter-spacing: 0.1em; margin: 2px 0; }
+  .sub { font-style: italic; font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
+  fieldset { border: none; border-top: 1px solid var(--rule); margin: 12px 0 0; padding: 8px 0 0; min-width: 0; }
+  legend { font-variant: small-caps; letter-spacing: 0.1em; font-size: 12.5px; padding-right: 8px; }
+  #lam { width: 100%; aspect-ratio: 1; display: block; touch-action: none; margin-top: 4px; }
+  .small { font-size: 11.5px; color: var(--muted); font-style: italic; margin: 4px 0; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 5px 0; }
+  .row > label:first-child { flex: 0 0 78px; }
+  .row input[type=range] { flex: 1 1 auto; min-width: 0; }
+  input[type=range] { accent-color: var(--accent); }
+  input[type=number] {
+    width: 62px; background: transparent; border: none; border-bottom: 1px solid var(--rule); color: var(--ink);
+    font-family: 'Courier New', monospace; font-size: 12.5px; padding: 1px 0;
+  }
+  input[type=number]:focus { outline: none; border-bottom-color: var(--accent); }
+  select, button {
+    font-family: inherit; font-size: 13px; background: transparent; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 2px; padding: 3px 8px; cursor: pointer;
+  }
+  select { flex: 1 1 auto; min-width: 0; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.play { width: 28px; padding: 2px 0; flex: 0 0 auto; }
+  button.play.on { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .btnrow .grow { flex: 1; }
+  .alpharow { display: flex; gap: 6px; align-items: center; margin: 3px 0; font-size: 13px; }
+  .alpharow .name { flex: 0 0 28px; }
+  .alpharow label { color: var(--muted); font-size: 12px; }
+  .alpharow button { padding: 0 6px; font-size: 12px; margin-left: auto; }
+  .cb { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
+  input[type=color] { width: 34px; height: 22px; border: 1px solid var(--rule); background: none; padding: 0; }
+  details { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 8px; }
+  summary { cursor: pointer; font-variant: small-caps; letter-spacing: 0.1em; font-size: 12.5px; }
+  details p { font-size: 12.5px; margin: 6px 0; }
+  .hide { display: none !important; }
+  @media (max-width: 840px) {
+    html, body { height: auto; min-height: 100%; }
+    body { flex-direction: column; overflow: auto; }
+    #stage { flex: none; height: 62vh; min-height: 320px; }
+    #panel { flex: none; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--rule);
+      padding: 10px 16px 48px; background: var(--paper2); }
+    #lam { max-width: 360px; margin: 4px auto 0; }
+    #keys { display: none; }
+    input[type=number], select { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view"></canvas>
+  <div id="status"></div>
+  <div id="busy"></div>
+  <div id="keys">drag: rotate · shift-drag: roll · wheel / ±: zoom · WASD QE: move · F: frame · R: reset</div>
+</div>
+
+<aside id="panel">
+  <h1>CMC surfaces</h1>
+  <p class="sub">Immersions of the plane with constant mean curvature H = ½, built from spectral data by integrating polynomial Killing fields.</p>
+
+  <fieldset>
+    <legend>Spectral data</legend>
+    <canvas id="lam"></canvas>
+    <p class="small">Drag the branch points α (dots) and the Sym point λ₀ (diamond). Shift-drag turns everything together. Double-click to add or remove a branch point. The blue rings mark the eigenline divisor at the centre of the domain.</p>
+    <div class="btnrow">
+      <button id="addAlpha" type="button">+ branch point</button>
+      <button id="remAlpha" type="button">− branch point</button>
+      <span class="grow"></span><span id="genus"></span>
+    </div>
+    <div id="alphaList"></div>
+    <div class="alpharow">
+      <span class="name">λ₀</span><label>arg</label><input type="number" id="theta0" step="0.01">
+      <span class="grow"></span>
+      <button class="play" id="playLam" type="button" title="sweep λ₀ around the circle (associated family)">▶</button>
+    </div>
+  </fieldset>
+
+  <fieldset id="tauBox">
+    <legend>Isospectral deformation</legend>
+    <div id="tauList"></div>
+    <p class="small" id="tauNote"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Domain in the z-plane</legend>
+    <div id="domainRows"></div>
+    <label class="cb"><input type="checkbox" id="curv" checked> align grid with curvature lines</label>
+    <div id="phiRow"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Appearance</legend>
+    <div class="row"><label for="colour">colour</label>
+      <select id="colour">
+        <option value="side">two-sided</option>
+        <option value="u">conformal factor u</option>
+        <option value="K">Gauss curvature K</option>
+      </select></div>
+    <label class="cb"><input type="checkbox" id="grid" checked> draw parameter lines</label>
+    <div id="appearanceRows"></div>
+    <div class="row"><label>colours</label>
+      <input type="color" id="front" title="the side N points to (mean-convex side)" value="#6f8fb0">
+      <input type="color" id="back" title="the other side" value="#e8c9a0">
+      <input type="color" id="bg" title="background" value="#f5f0e4">
+    </div>
+    <div class="row"><label for="res">resolution</label>
+      <select id="res">
+        <option value="96">96</option><option value="160">160</option>
+        <option value="240" selected>240</option><option value="360">360</option><option value="512">512</option>
+      </select></div>
+    <div class="row"><label for="acc">accuracy</label>
+      <select id="acc">
+        <option value="0.1">fast (h ≤ 0.1)</option>
+        <option value="0.05" selected>normal (h ≤ 0.05)</option>
+        <option value="0.02">high (h ≤ 0.02)</option>
+      </select></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Presets &amp; export</legend>
+    <div class="row"><select id="preset"></select></div>
+    <div class="btnrow">
+      <button id="frameBtn" type="button">frame</button>
+      <button id="pngBtn" type="button">PNG</button>
+      <button id="objBtn" type="button">OBJ</button>
+      <button id="linkBtn" type="button">copy link</button>
+    </div>
+  </fieldset>
+
+  <details>
+    <summary>About</summary>
+    <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion, with metric 4e²ᵘ|dz|².</p>
+    <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
+    <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>.</p>
+  </details>
+</aside>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

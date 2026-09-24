@@ -396,7 +396,8 @@ export function hopfArg(alphas, theta0) {
  *   nx, ny   grid resolution
  *   hmax     RK4 step bound
  *
- * Returns { nx, ny, pos, nrm (Float32Array 3N), u, st (Float32Array N / 2N), bbox, divisor, stats }.
+ * Returns { nx, ny, pos, nrm (Float32Array 3N), u (N), st (2N), bbox, phi, divisor, stats }, where
+ * st holds the rotated coordinates w = e^{-i phi} z of each vertex (for drawing parameter lines).
  * Vertex (i, j) has index j*nx + i.
  */
 export function computeSurface(params) {
@@ -425,6 +426,8 @@ export function computeSurface(params) {
   const t = Array.from({ length: ny }, (_, j) => -height / 2 + (ny > 1 ? (j * height) / (ny - 1) : 0));
   const csr = Math.cos(phi), csi = Math.sin(phi); // s-direction
   const ctr = -csi, cti = csr;                   // t-direction = i e^{i phi}
+  // grid coordinates w = e^{-i phi} z are absolute, so parameter lines stay put when z0 moves
+  const w0 = [csr * z0[0] + csi * z0[1], csr * z0[1] - csi * z0[0]];
   const P = new Float64Array(3), Nv = new Float64Array(3);
   let maxDet = 0;
   const lam = [Math.cos(theta0 + 0.3), Math.sin(theta0 + 0.3)];
@@ -450,7 +453,7 @@ export function computeSurface(params) {
       u[v] = I.evaluate(yt, P, 0, Nv, 0);
       pos[3 * v] = P[0]; pos[3 * v + 1] = P[1]; pos[3 * v + 2] = P[2];
       nrm[3 * v] = Nv[0]; nrm[3 * v + 1] = Nv[1]; nrm[3 * v + 2] = Nv[2];
-      st[2 * v] = s[i]; st[2 * v + 1] = t[j];
+      st[2 * v] = s[i] + w0[0]; st[2 * v + 1] = t[j] + w0[1];
     });
     maxDet = Math.max(maxDet, detDefect(ys.subarray(0, 8 * (g + 2)), I.a, lam[0], lam[1]));
   });
