@@ -8,6 +8,7 @@ import {
 } from '../src/cmc/cmc.js';
 import { periodVector, periodLattice, commonRootsOnCircle } from '../src/cmc/periods.js';
 import { WhithamCurve } from '../src/cmc/whitham.js';
+import { RootFlow, symData } from '../src/cmc/rootflow.js';
 
 let failures = 0;
 function check(name, value, tol) {
@@ -235,6 +236,24 @@ for (const [name, al] of [
   const C = new WhithamCurve([[0.4, 0.25], [-0.3, 0.5], [0.1, -0.6]]);
   const r = C.at(0.2), q = C.at(-0.2);
   check('g=3: Whitham curve continues to s = ±0.2', Math.max(Math.abs(r.s - 0.2), Math.abs(q.s + 0.2)), 1e-3);
+}
+
+// ------------------------------------------------------------------ root-preserving flow (CKKS, genus 2)
+{
+  const PI = Math.PI, W = [[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]];
+  const phi = symData(W, 0).phi;
+  check('Wente: Sym integrals phi = (pi/3, pi/3)', Math.hypot(phi[0] - PI / 3, phi[1] - PI / 3), 1e-7);
+  const run = (f, target) => { let r; for (let i = 0; i < 500; i++) { r = f.moveToward(target, { budget: 50 }); if (r.reached || r.blocked) break; } return r; };
+  const f = new RootFlow(W, 0);
+  const r = run(f, [PI / 4, PI / 2]);
+  const cr = commonRootsOnCircle(r.alphas, 1e-5);
+  check('flow reaches phi = (pi/4, pi/2)', r.reached ? Math.hypot(r.phi[0] - PI / 4, r.phi[1] - PI / 2) : Infinity, 1e-9);
+  check('flow keeps the common root at lam0 = 1', cr.length ? Math.min(...cr.map((c) => Math.hypot(c.lam[0] - 1, c.lam[1]))) : Infinity, 1e-8);
+  run(f, [0.4 * PI, 0.2 * PI]);
+  const back = run(f, [PI / 3, PI / 3]);
+  check('flow around a loop returns to the Wente data (no holonomy)', Math.hypot(...back.alphas.flat().map((v, i) => v - W.flat()[i])), 1e-7);
+  const end = run(new RootFlow(W, 0), [0.6 * PI, 0.6 * PI]);
+  check('flow ends on the hypotenuse phi_1 + phi_2 = pi', end.blocked ? Math.abs(end.phi[0] + end.phi[1] - PI) / PI : Infinity, 1e-3);
 }
 
 // ------------------------------------------------------------------ timing

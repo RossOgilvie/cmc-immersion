@@ -171,6 +171,7 @@
   .bprow .gly { justify-self: end; }
   sub { font-size: 0.68em; line-height: 0; }
 
+  #symPad { width: 100%; max-width: 290px; aspect-ratio: 1; display: block; margin: 2px auto 0; touch-action: none; }
   #domainRows { --labw: 50px; }
   #phiRow { --labw: 50px; }
   #appearanceRows { --labw: 96px; }
@@ -243,6 +244,14 @@
       <label class="cb"><input type="checkbox" class="chk" id="whithamDomain" checked><span>Carry the domain along</span></label>
       <label class="cb"><input type="checkbox" class="chk" id="showFamily" checked><span>Show the family in the λ-plane</span></label>
       <p class="note" id="whithamNote"></p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="rootBox"><span class="chev" data-glyph="chev"></span>Root-preserving flow</button></h2>
+    <div class="secbody" id="rootBox">
+      <canvas id="symPad" aria-label="Sym integrals (φ₁, φ₂); drag to move along the flow"></canvas>
+      <p class="note" id="rootNote"></p>
     </div>
   </section>
 
@@ -322,6 +331,7 @@
       <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
       <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
       <p>The slider shows the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (in the frame fixed where the slider was last recentred); click the value to enter one. The slider spans the whole family: its ends are where the flow meets an obstacle, a branch point reaching 0 or the unit circle (or two colliding). With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by 𝒲 (blue low, rust high). A tick across the paths, and on the slider, marks critical points of 𝒲, which are where the differentials have a common root, as for tori; the slider snaps onto it.</p>
+      <p>Root-preserving flow (Carberry–Kilian–Klein–Schmidt): when λ₀ is a common root of the differentials Θ (the data lie on S<sup>g</sup>), the branch points can move keeping the periods of Θ and the common root at λ₀. For genus 2 this flow is two-dimensional, and its coordinates are the Sym integrals φ₁, φ₂: half the integrals of the two differentials with B-periods 2πi, once around the unit circle from λ₀. They fill the triangle φ₁ + φ₂ &lt; π; the dashed diagonal is the Wente family, and where φ is a rational multiple of π in both coordinates the surface closes into a torus (the pad snaps to these points with denominator up to 6). Drag the dot to move along the flow; hold alt to avoid snapping.</p>
       <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>. Type: EB Garamond (SIL Open Font License).</p>
     </div>
   </section>

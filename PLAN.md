@@ -119,5 +119,9 @@ test/
   Not done: the algebraic Whitham ODE of the lemma (not needed for speed yet: 60–170 ms per family).
 - Whitham: done as a slider (continuation keeping [ell] in CP^{g-1} and arg a(0) fixed). Open: use the
   Willmore functional as the flow parameter, and follow the common root of B_a as a moving Sym point.
+- Root-preserving flow (CKKS), genus 2: done as a pad of the Sym integrals (phi_1, phi_2), solved by
+  Gauss–Newton with the common root pinned at lam0 (src/cmc/rootflow.js). Open: odd g (definition of phi),
+  g >= 3 (period plane as extra constraint; phi may fail to be a chart: path-follow and mark folds), an
+  extension off S^g, and a close-up that uses the torus lattice at rational phi.
 - The $S^3$ version (two Sym points), and a pen-and-ink hatching style like the example page.
 - Direct dragging of divisor points (this needs an inverse map from divisor to $\tau$).

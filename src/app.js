@@ -5,6 +5,8 @@ import { SpectralWidget, MAX_GENUS } from './spectral-widget.js';
 import { shapeFlows, kappa0, hopfArg } from './cmc/cmc.js';
 import { WhithamCurve, willmore } from './cmc/whitham.js';
 import { commonRootsOnCircle } from './cmc/periods.js';
+import { RootFlow, symData } from './cmc/rootflow.js';
+import { SymPad, denominator } from './sym-pad.js';
 
 const $ = (id) => document.getElementById(id);
 const polar = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
@@ -254,6 +256,7 @@ function changed(dragging = false) {
   whithamSlider.refresh();
   requestFamily();
   updateCommonRoots();
+  rootUpdate();
   request(false);
   clearTimeout(fullTimer);
   fullTimer = setTimeout(() => request(true), dragging || anim ? 350 : 0);
@@ -576,7 +579,87 @@ function updateCommonRoots() {
   if (genus() >= 1) {
     try { roots = commonRootsOnCircle(state.alphas, 1e-5).map((r) => r.lam); } catch { roots = []; }
   }
+  commonRoots = roots;
   widget.set({ commonRoots: roots });
+}
+let commonRoots = [];
+
+// ------------------------------------------------------------------ root-preserving flow (genus 2)
+
+// Active when lam0 sits on a common root of the differentials (the data are on S^2). The pad shows the
+// Sym integrals (phi_1, phi_2); dragging sets a target that the flow chases, a little per frame.
+const root = { flow: null, key: null, target: null, dragging: false, running: false };
+const rootKey = () => JSON.stringify([state.alphas, state.theta0]);
+const pad = new SymPad($('symPad'), (phi, dragging) => {
+  root.target = phi;
+  root.dragging = dragging;
+  if (anim) stopAnim();
+  rootChase();
+});
+
+function onCommonRoot() {
+  const [c, s] = [Math.cos(state.theta0), Math.sin(state.theta0)];
+  return commonRoots.some(([re, im]) => Math.hypot(re - c, im - s) < 1e-7);
+}
+
+/** After any change of the spectral data other than our own moves: re-anchor the pad. */
+function rootUpdate() {
+  if (root.key === rootKey()) return;
+  root.flow = null;
+  root.key = null;
+  root.target = null;
+  let phi = null;
+  if (genus() === 2 && onCommonRoot()) {
+    try { phi = symData(state.alphas, state.theta0).phi; } catch { phi = null; }
+  }
+  pad.set({ phi, target: null, blocked: false });
+  rootNote(phi, false);
+}
+
+function rootNote(phi, blocked) {
+  const el = $('rootNote');
+  if (genus() !== 2) { el.textContent = 'Genus 2 only, for now.'; return; }
+  if (!phi) { el.textContent = 'Move λ₀ onto a common root (◆) to enable.'; return; }
+  const frac = (x) => {
+    const u = x / PI, q = denominator(u, 24, 1e-7);
+    if (!Number.isFinite(q)) return null;
+    const p = Math.round(u * q);
+    return p === 0 ? '0' : q === 1 ? String(p) : `${p}/${q}`;
+  };
+  const f = phi.map(frac);
+  el.textContent = f.every(Boolean)
+    ? `Torus: φ = (${f[0]}, ${f[1]}) π`
+    : `φ = (${fixed(phi[0] / PI, 3)}, ${fixed(phi[1] / PI, 3)}) π`;
+  if (blocked) el.textContent += ' · the flow ends here';
+}
+
+function rootChase() {
+  if (root.running) return;
+  root.running = true;
+  const step = () => {
+    if (!root.target || genus() !== 2) { root.running = false; return; }
+    let r;
+    try {
+      if (!root.flow) root.flow = new RootFlow(state.alphas, state.theta0);
+      r = root.flow.moveToward(root.target, { budget: 12 });
+    } catch (e) {
+      root.running = false;
+      $('rootNote').textContent = String(e.message || e);
+      return;
+    }
+    state.alphas = r.alphas;
+    root.key = rootKey();
+    widget.set({ alphas: state.alphas });
+    refreshAlphaValues();
+    pad.set({ phi: r.phi, blocked: r.blocked });
+    rootNote(r.phi, r.blocked);
+    const done = r.reached || r.blocked;
+    if (done && !root.dragging) { root.running = false; changed(false); return; }
+    if (!busy) changed(true);
+    if (done) { root.running = false; return; }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // ------------------------------------------------------------------ Whitham deformation
