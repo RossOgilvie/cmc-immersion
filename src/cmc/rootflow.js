@@ -14,6 +14,12 @@
 // Gauss–Newton, following a straight path in phi in small steps so the solution stays on one branch.
 // Implemented for even g (the real locus over |lam| = 1 is then one circle, and going once around it
 // runs from sigma(y) to y); the definition for odd g is open.
+//
+// Genus >= 4: the period plane (the span of the B-period vectors of B_a in R^g) is a real constraint,
+// 2(g - 2) equations, and there is no canonical basis: b_1, b_2 are the differentials whose B-periods are
+// fixed vectors P_1, P_2 spanning the plane (by default orthonormal; phi changes by a linear map with P).
+// Unknowns 2g, equations: common root (2 effective) + plane (2g - 4) + phi (2), so the flow is still
+// 2-dimensional. Its image in the phi-plane is not known, so the pad marks where the flow stops.
 
 import { aPoly } from './cmc.js';
 import { basicPeriods, thetaPolyB } from './periods.js';
@@ -74,24 +80,54 @@ function circlePanels(alphas, theta0) {
   return panels;
 }
 
+/** An orthonormal basis of the span of the columns of Bm (g x 2, rows [v1_j, v2_j]). */
+export function planeBasis(Bm) {
+  const c1 = Bm.map((r) => r[0]), c2 = Bm.map((r) => r[1]);
+  const n1 = Math.hypot(...c1), P1 = c1.map((v) => v / n1);
+  const d = c2.reduce((s, v, j) => s + v * P1[j], 0);
+  const q = c2.map((v, j) => v - d * P1[j]), n2 = Math.hypot(...q);
+  return [P1, q.map((v) => v / n2)];
+}
+
+/** Orthonormal vectors completing the plane spanned by the orthonormal pair P to a basis of R^g. */
+function normals(P) {
+  const g = P[0].length, out = [...P];
+  for (let k = 0; k < g && out.length < g; k++) {
+    let v = Array.from({ length: g }, (_, j) => (j === k ? 1 : 0));
+    for (const u of out) { const d = v.reduce((s, x, j) => s + x * u[j], 0); v = v.map((x, j) => x - d * u[j]); }
+    const n = Math.hypot(...v);
+    if (n > 0.3) out.push(v.map((x) => x / n));
+  }
+  return out.slice(2);
+}
+
 /**
  * The spectral data at alphas with Sym point lam0 = e^{i theta0}: the normalised differentials p_1, p_i,
- * the basis with B-periods delta_kl, and the Sym integrals |phi_l| (the sign of phi_l depends only on
- * orientation choices, and CKKS choose it positive). Also the values of p_1, p_i at lam0 (zero on S^g).
+ * their B-periods Bm (g x 2, divided by 2 pi), the basis b_l with B-periods P_l, and the Sym integrals
+ * phi_l. For g = 2, P = delta_kl and phi = |phi_l| (the sign depends only on orientation choices, and CKKS
+ * choose it positive). For g >= 4, P defaults to an orthonormal basis of the period plane and phi keeps
+ * its sign (the caller fixes the orientation of P once). Also the values of p_1, p_i at lam0 (zero on S^g).
+ * The orientation of each B-cycle is arbitrary and can flip as alpha moves; with ref (an earlier Bm),
+ * each row of Bm is aligned with it, so that Bm (and with it the plane and the basis) moves continuously.
  */
-export function symData(alphas, theta0) {
+export function symData(alphas, theta0, P = null, ref = null) {
   const g = alphas.length;
   // only the B-cycles (loops around {0, alpha_j}) are needed: the A-periods vanish by the reality condition
-  const P = basicPeriods(alphas, M_PERIODS, 'B');
-  const p1 = thetaPolyB(alphas, [1, 0], P), pi = thetaPolyB(alphas, [0, 1], P);
+  const Per = basicPeriods(alphas, M_PERIODS, 'B');
+  const p1 = thetaPolyB(alphas, [1, 0], Per), pi = thetaPolyB(alphas, [0, 1], Per);
   const imPeriod = (p, Pj) => p.reduce((acc, c, k) => acc + c[0] * Pj[k][1] + c[1] * Pj[k][0], 0) / (2 * Math.PI);
-  const Bm = P.map((Pj) => [imPeriod(p1, Pj), imPeriod(pi, Pj)]);
+  const Bm = Per.map((Pj) => [imPeriod(p1, Pj), imPeriod(pi, Pj)]);
+  if (ref) Bm.forEach((r, j) => { if (r[0] * ref[j][0] + r[1] * ref[j][1] < 0) { r[0] = -r[0]; r[1] = -r[1]; } });
   const lam0 = [Math.cos(theta0), Math.sin(theta0)];
   const roots = [evalC(p1, lam0), evalC(pi, lam0)];
-  if (g !== 2) return { g, p1, pi, roots, phi: null };
-  const det = Bm[0][0] * Bm[1][1] - Bm[0][1] * Bm[1][0];
-  const basis = [[1, 0], [0, 1]].map(([e0, e1]) => {
-    const x = (Bm[1][1] * e0 - Bm[0][1] * e1) / det, y = (-Bm[1][0] * e0 + Bm[0][0] * e1) / det;
+  if (g < 2 || g % 2) return { g, p1, pi, roots, Bm, phi: null };
+  if (!P) P = g === 2 ? [[1, 0], [0, 1]] : planeBasis(Bm);
+  // b_l = x p_1 + y p_i with B-periods P_l (least squares: exact when the plane is the one P spans)
+  const G11 = Bm.reduce((s, r) => s + r[0] * r[0], 0), G12 = Bm.reduce((s, r) => s + r[0] * r[1], 0);
+  const G22 = Bm.reduce((s, r) => s + r[1] * r[1], 0), det = G11 * G22 - G12 * G12;
+  const basis = P.map((Pl) => {
+    const r0 = Bm.reduce((s, r, j) => s + r[0] * Pl[j], 0), r1 = Bm.reduce((s, r, j) => s + r[1] * Pl[j], 0);
+    const x = (G22 * r0 - G12 * r1) / det, y = (G11 * r1 - G12 * r0) / det;
     return p1.map((c, k) => [x * c[0] + y * pi[k][0], x * c[1] + y * pi[k][1]]);
   });
   // q_l(y) = 1/2 int over theta0 .. theta0 + 2 pi of i b(lam) / nu dtheta, nu = sqrt(lam a) continued.
@@ -99,7 +135,11 @@ export function symData(alphas, theta0) {
   // width ~ 1 - |alpha| at arg alpha, so the panels are graded geometrically towards each arg alpha_j.
   const a = aPoly(alphas);
   const acc = [0, 0];
-  let prev = null;
+  // the sheet at the start: on the circle nu = i lam^{(g+1)/2} prod |lam - alpha_j|, with lam^{(g+1)/2} taken
+  // as e^{i theta0 (g+1)/2}. (The principal square root of lam0 a(lam0) jumps when that value crosses the
+  // cut, which would flip the sign of phi.)
+  const psi = (theta0 * (g + 1)) / 2;
+  let prev = [-Math.sin(psi), Math.cos(psi)];
   for (const [t0, t1] of circlePanels(alphas, theta0)) {
     const c = (t0 + t1) / 2, r = (t1 - t0) / 2;
     for (let k = 0; k < GL.x.length; k++) {
@@ -116,8 +156,10 @@ export function symData(alphas, theta0) {
       }
     }
   }
-  // latticeScale: sqrt of the area of the period lattice (in w = x + iy, p_w = x p_1 + y p_i: Bm^{-1} Z^2)
-  return { g, p1, pi, roots, basis, phi: [Math.abs(acc[0] / 2), Math.abs(acc[1] / 2)], latticeScale: 1 / Math.sqrt(Math.abs(det)) };
+  // latticeScale: the length scale of the periods in w = x + iy (p_w = x p_1 + y p_i): for g = 2 the
+  // square root of the area of the lattice Bm^{-1} Z^2; in general det(Bm^T Bm)^(-1/4)
+  const phi = g === 2 ? [Math.abs(acc[0] / 2), Math.abs(acc[1] / 2)] : [acc[0] / 2, acc[1] / 2];
+  return { g, p1, pi, roots, Bm, P, basis, phi, latticeScale: Math.abs(det) ** -0.25 };
 }
 
 /** True when lam0 is (numerically) a common root of B_a, i.e. the data lie on S^g with Sym point lam0. */
@@ -167,25 +209,42 @@ function solveSq(A, b) {
  * the rotation freedom.
  */
 export class RootFlow {
-  constructor(alphas, theta0) {
-    if (alphas.length !== 2) throw new Error('The root-preserving flow is implemented for genus 2');
+  /** P: the period vectors of b_1, b_2 (default as in symData). */
+  constructor(alphas, theta0, P = null) {
+    const g = alphas.length;
+    if (g < 2 || g % 2) throw new Error('The root-preserving flow is implemented for even genus');
     this.theta0 = theta0;
     this.x = flat(alphas);
-    this.phi = symData(alphas, theta0).phi;
+    const d = symData(alphas, theta0, P);
+    this.P = d.P;
+    this.phi = d.phi;
+    this.ref = d.Bm; // cycle orientations, carried along (see symData)
+    // the period plane stays fixed: its normals, from the starting data
+    this.normals = g === 2 ? [] : normals(planeBasis(d.Bm));
+    this.edge = g === 2 ? edgeDistance : () => Infinity; // the image of phi is known for g = 2 only
   }
 
   get alphas() { return unflat(this.x); }
 
-  /** Residuals: the common root (4 reals, scaled) and phi - target (2). */
+  /** Residuals: the common root (4 reals, scaled), the period plane (2(g - 2)) and phi - target (2). */
   residual(x, target) {
     const alphas = unflat(x);
     const rs = alphas.map(([re, im]) => Math.hypot(re, im));
     if (!rs.every((r) => r > R_LO && r < R_HI)) return null;
-    if (Math.hypot(alphas[0][0] - alphas[1][0], alphas[0][1] - alphas[1][1]) < 1e-3 * Math.max(...rs)) return null;
-    const d = symData(alphas, this.theta0);
+    for (let i = 0; i < alphas.length; i++) for (let j = i + 1; j < alphas.length; j++) {
+      if (Math.hypot(alphas[i][0] - alphas[j][0], alphas[i][1] - alphas[j][1]) < 1e-3 * Math.max(rs[i], rs[j])) return null;
+    }
+    const d = symData(alphas, this.theta0, this.P, this.ref);
     // the root equations relative to the size of the differentials (which scale with alpha)
     const s = 1 / Math.max(...d.p1.map(([re, im]) => Math.hypot(re, im)));
-    return { F: [d.roots[0][0] * s, d.roots[0][1] * s, d.roots[1][0] * s, d.roots[1][1] * s, d.phi[0] - target[0], d.phi[1] - target[1]], phi: d.phi };
+    const F = [d.roots[0][0] * s, d.roots[0][1] * s, d.roots[1][0] * s, d.roots[1][1] * s];
+    // both period vectors (normalised) orthogonal to the normals of the starting plane
+    for (let l = 0; l < 2; l++) {
+      const c = d.Bm.map((r) => r[l]), n = Math.hypot(...c);
+      for (const N of this.normals) F.push(c.reduce((acc, v, j) => acc + v * N[j], 0) / n);
+    }
+    F.push(d.phi[0] - target[0], d.phi[1] - target[1]);
+    return { F, phi: d.phi, Bm: d.Bm };
   }
 
   /** Gauss–Newton from x to the point with Sym integrals target. Returns the new x and phi, or null. */
@@ -195,7 +254,7 @@ export class RootFlow {
     if (!r) return null;
     for (let it = 0; it < 12; it++) {
       const n0 = Math.hypot(...r.F);
-      if (n0 < tol) return { x, phi: r.phi };
+      if (n0 < tol) return { x, phi: r.phi, Bm: r.Bm };
       const eps = 1e-7, J = [];
       for (let i = 0; i < x.length; i++) {
         const xp = x.slice(); xp[i] += eps;
@@ -218,16 +277,17 @@ export class RootFlow {
         const rt = this.residual(xt, target);
         if (rt && Math.hypot(...rt.F) < n0) { next = { x: xt, r: rt }; break; }
       }
-      if (!next) return Math.hypot(...r.F) < 1e-7 ? { x, phi: r.phi } : null;
+      if (!next) return Math.hypot(...r.F) < 1e-7 ? { x, phi: r.phi, Bm: r.Bm } : null;
       x = next.x; r = next.r;
     }
-    return Math.hypot(...r.F) < 1e-7 ? { x, phi: r.phi } : null;
+    return Math.hypot(...r.F) < 1e-7 ? { x, phi: r.phi, Bm: r.Bm } : null;
   }
 
   /**
    * Moves towards target along the straight segment in phi, in steps of at most `step`, for at most
-   * `budget` ms. Returns { alphas, phi, reached, blocked }: blocked when the flow can't continue
-   * (a branch point reaching 0 or the circle, a collision, or the solver failing: an end of S^2).
+   * `budget` ms. Returns { alphas, phi, reached, blocked, why }: blocked when the flow can't continue,
+   * why = 'circle' | 'zero' | 'collision' (a branch point near the unit circle or 0, or two meeting:
+   * an end of S^g) or 'fold' (the solver fails in the interior: phi folds over, and stops being a chart).
    */
   moveToward(target, { step = 0.03, budget = 12 } = {}) {
     const t0 = performance.now();
@@ -244,17 +304,18 @@ export class RootFlow {
       // Near the edge of the triangle the chart phi degenerates (a small change of phi needs a large
       // change of alpha), so steps are kept below 0.3 x the distance to the edge, and the flow stops
       // EDGE_MARGIN short of it, from where it can always step back inside.
-      const e0 = edgeDistance(this.phi), cap = Math.max(1e-7, Math.min(step, 0.3 * e0));
+      const e0 = this.edge(this.phi), cap = Math.max(1e-7, Math.min(step, 0.3 * e0));
       h = Math.min(h, cap);
       const f = Math.min(1, h / dist);
       const want = [this.phi[0] + f * dphi[0], this.phi[1] + f * dphi[1]];
-      const ew = edgeDistance(want);
+      const ew = this.edge(want);
       if (ew < EDGE_MARGIN && ew < e0) { blocked = true; break; }
       const res = this.correct(this.x, want);
       // reject jumps: a converged point far from the start is on another branch
       if (res && Math.hypot(...res.x.map((v, i) => v - this.x[i])) < 0.5) {
         this.x = res.x;
         this.phi = res.phi;
+        this.ref = res.Bm;
         h = Math.min(step, h * 2);
       } else if (h > cap / 1024) {
         h /= 4;
@@ -266,7 +327,19 @@ export class RootFlow {
     this.h = h;
     if (blocked) this.lastTarget = null; // a new request from here starts afresh
     const reached = Math.hypot(target[0] - this.phi[0], target[1] - this.phi[1]) < 1e-9;
-    return { alphas: this.alphas, phi: this.phi.slice(), reached, blocked };
+    return { alphas: this.alphas, phi: this.phi.slice(), reached, blocked, why: blocked ? this.why() : null };
+  }
+
+  /** Why the flow stopped at the current point (see moveToward). */
+  why() {
+    if (this.alphas.length === 2 && this.edge(this.phi) < 2 * EDGE_MARGIN) return 'edge';
+    const al = this.alphas, rs = al.map(([re, im]) => Math.hypot(re, im));
+    if (Math.max(...rs) > 0.95) return 'circle';
+    if (Math.min(...rs) < 0.02) return 'zero';
+    for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
+      if (Math.hypot(al[i][0] - al[j][0], al[i][1] - al[j][1]) < 0.02 * Math.max(rs[i], rs[j])) return 'collision';
+    }
+    return 'fold';
   }
 
 }

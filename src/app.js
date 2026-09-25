@@ -615,11 +615,14 @@ function updateCommonRoots() {
 }
 let commonRoots = [];
 
-// ------------------------------------------------------------------ root-preserving flow (genus 2)
+// ------------------------------------------------------------------ root-preserving flow (even genus)
 
-// Active when lam0 sits on a common root of the differentials (the data are on S^2). The pad shows the
+// Active when lam0 sits on a common root of the differentials (the data are on S^g). The pad shows the
 // Sym integrals (phi_1, phi_2); dragging sets a target that the flow chases, a little per frame.
-const root = { flow: null, key: null, target: null, dragging: false, running: false, scale: null };
+// Genus 2: phi on the CKKS triangle. Genus >= 4: phi for a basis of the period plane fixed at the anchor
+// (P, oriented so that phi starts out positive); the pad maps the region the flow reaches as it goes.
+const root = { flow: null, key: null, target: null, dragging: false, running: false, scale: null, P: null };
+const rootGenus = () => genus() >= 2 && genus() % 2 === 0;
 const rootKey = () => JSON.stringify([state.alphas, state.theta0]);
 const pad = new SymPad($('symPad'), (phi, dragging) => {
   root.target = phi;
@@ -639,18 +642,38 @@ function rootUpdate() {
   root.flow = null;
   root.key = null;
   root.target = null;
+  root.P = null;
   let phi = null;
-  if (genus() === 2 && onCommonRoot()) {
-    try { phi = symData(state.alphas, state.theta0).phi; } catch { phi = null; }
+  if (rootGenus() && onCommonRoot()) {
+    try {
+      const d = symData(state.alphas, state.theta0);
+      phi = d.phi;
+      if (genus() > 2) {
+        root.P = d.P.map((Pl, l) => (phi[l] < 0 ? Pl.map((v) => -v) : Pl));
+        phi = phi.map(Math.abs);
+      }
+    } catch { phi = null; }
   }
-  pad.set({ phi, target: null, blocked: false });
+  const free = genus() > 2;
+  if (free && phi) pad.centre(phi);
+  pad.set({ mode: free ? 'free' : 'triangle', phi, target: null, blocked: false, trail: [], marks: [] });
   rootNote(phi, false);
 }
 
-function rootNote(phi, blocked) {
+const WHY = {
+  edge: '', circle: ' (a branch point nears the unit circle)', zero: ' (a branch point nears 0)',
+  collision: ' (two branch points meet)', fold: ' (φ folds over here)',
+};
+
+function rootNote(phi, blocked, why = null) {
   const el = $('rootNote');
-  if (genus() !== 2) { el.textContent = 'Genus 2 only, for now.'; return; }
+  if (!rootGenus()) { el.textContent = 'Even genus only, for now.'; return; }
   if (!phi) { el.textContent = 'Move λ₀ onto a common root (◆) to enable.'; return; }
+  if (genus() > 2) {
+    el.textContent = `φ = (${fixed(phi[0] / PI, 4)}, ${fixed(phi[1] / PI, 4)}) π, for an orthonormal basis of the period plane`;
+    if (blocked) el.textContent += ` · the flow ends here${WHY[why] || ''}`;
+    return;
+  }
   const frac = (x) => {
     const u = x / PI, q = denominator(u, 24, 1e-7);
     if (!Number.isFinite(q)) return null;
@@ -661,21 +684,21 @@ function rootNote(phi, blocked) {
   el.textContent = f.every(Boolean)
     ? `Torus: φ = (${f[0]}, ${f[1]}) π`
     : `φ = (${fixed(phi[0] / PI, 3)}, ${fixed(phi[1] / PI, 3)}) π`;
-  if (blocked) el.textContent += ' · the flow ends here';
+  if (blocked) el.textContent += ` · the flow ends here${WHY[why] || ''}`;
 }
 
 function rootChase() {
   if (root.running) return;
   root.running = true;
   const step = () => {
-    if (!root.target || genus() !== 2) { root.running = false; return; }
+    if (!root.target || !rootGenus()) { root.running = false; return; }
     let r;
     try {
       if (!root.flow) {
-        root.flow = new RootFlow(state.alphas, state.theta0);
+        root.flow = new RootFlow(state.alphas, state.theta0, root.P);
         root.scale = symData(state.alphas, state.theta0).latticeScale;
       }
-      r = root.flow.moveToward(root.target, { budget: 12 });
+      r = root.flow.moveToward(root.target, { budget: 12, step: genus() > 2 ? 0.005 : 0.03 });
     } catch (e) {
       root.running = false;
       $('rootNote').textContent = String(e.message || e);
@@ -694,8 +717,12 @@ function rootChase() {
     root.scale = scale;
     widget.set({ alphas: state.alphas });
     refreshAlphaValues();
+    if (genus() > 2) {
+      pad.trail.push(r.phi);
+      if (r.blocked) pad.marks.push(r.phi);
+    }
     pad.set({ phi: r.phi, blocked: r.blocked });
-    rootNote(r.phi, r.blocked);
+    rootNote(r.phi, r.blocked, r.why);
     const done = r.reached || r.blocked;
     if (done && !root.dragging) { root.running = false; changed(false); return; }
     if (!busy) changed(true);

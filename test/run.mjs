@@ -238,7 +238,7 @@ for (const [name, al] of [
   check('g=3: Whitham curve continues to s = ±0.2', Math.max(Math.abs(r.s - 0.2), Math.abs(q.s + 0.2)), 1e-3);
 }
 
-// ------------------------------------------------------------------ root-preserving flow (CKKS, genus 2)
+// ------------------------------------------------------------------ root-preserving flow (CKKS), genus 2
 {
   const PI = Math.PI, W = [[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]];
   const phi = symData(W, 0).phi;
@@ -254,6 +254,26 @@ for (const [name, al] of [
   check('flow around a loop returns to the Wente data (no holonomy)', Math.hypot(...back.alphas.flat().map((v, i) => v - W.flat()[i])), 1e-7);
   const end = run(new RootFlow(W, 0), [0.6 * PI, 0.6 * PI]);
   check('flow stops just short of the hypotenuse phi_1 + phi_2 = pi', end.blocked ? Math.abs(end.phi[0] + end.phi[1] - PI) / PI : Infinity, 5e-3);
+}
+
+// ------------------------------------------------------------------ root-preserving flow, genus 4
+// Data on S^4 with real coefficients (the critical point of W on the Whitham curve through a symmetric
+// start), lam0 = 1. The flow keeps the common root and the period plane; phi_2 = 0 by the symmetry.
+{
+  const PI = Math.PI;
+  const A = [[0.241595657003, 0.131253423469], [0.241595657003, -0.131253423469], [-0.226370306867, 0.288849491705], [-0.226370306867, -0.288849491705]];
+  const d0 = symData(A, 0);
+  check('genus 4: phi_2 = 0 for real coefficients', Math.abs(d0.phi[1]), 1e-9);
+  const P = d0.P.map((Pl, l) => (d0.phi[l] < 0 ? Pl.map((v) => -v) : Pl));
+  const f = new RootFlow(A, 0, P);
+  const target = [f.phi[0] + 0.004 * PI, f.phi[1] + 0.004 * PI];
+  let r; for (let i = 0; i < 500; i++) { r = f.moveToward(target, { budget: 50, step: 0.005 }); if (r.reached || r.blocked) break; }
+  check('genus 4: flow reaches a nearby target', r.reached ? Math.hypot(r.phi[0] - target[0], r.phi[1] - target[1]) : Infinity, 1e-9);
+  const cr = commonRootsOnCircle(r.alphas, 1e-5);
+  check('genus 4: flow keeps the common root at lam0 = 1', cr.length ? Math.min(...cr.map((c) => Math.hypot(c.lam[0] - 1, c.lam[1]))) : Infinity, 1e-8);
+  const d = symData(r.alphas, 0, P, f.ref);
+  const planeErr = Math.max(...[0, 1].flatMap((l) => { const c = d.Bm.map((row) => row[l]), n = Math.hypot(...c); return f.normals.map((N) => Math.abs(c.reduce((acc, v, j) => acc + v * N[j], 0) / n)); }));
+  check('genus 4: flow keeps the period plane', planeErr, 1e-9);
 }
 
 // ------------------------------------------------------------------ timing
