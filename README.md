@@ -23,8 +23,8 @@ No build step. Serve the folder statically and open `index.html`:
   conformal type and scales by 1/z; the domain can follow it). *Recentre here* makes the current curve
   the slider's centre; editing the spectral data any other way does so automatically.
   *Show the family* draws, live, the path of each branch point along the Whitham curve through the
-  current data, coloured by the Willmore functional 𝒲 (blue low, red high), with small
-  rings at the critical points of 𝒲.
+  current data, coloured by the Willmore functional 𝒲 (blue low, red high), with a tick
+  across the paths at the critical points of 𝒲.
 - **Domain:** *close up* trims to one closed piece along the grid directions; *reset domain* returns to
   the domain of the last preset, link or close-up. *Reset view* resets the rotation and frames.
 - The state lives in the URL hash, so links reproduce the surface.

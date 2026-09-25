@@ -340,12 +340,13 @@ $('remAlpha').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ sliders
 
-function slider(parent, { label, min, max, step, get, set, digits = 3, play, recompute = true }) {
+function slider(parent, { label, min, max, step, get, set, digits = 3, play, recompute = true, number = true }) {
   const after = recompute ? changed : writeHashSoon;
   const row = document.createElement('div');
   row.className = 'row';
   row.innerHTML = `${label ? `<label>${label}</label>` : ''}<input type="range"><input type="number">`;
   const [rng, num] = row.querySelectorAll('input');
+  if (!number) num.remove(); // still updated, just not shown
   Object.assign(rng, { min, max, step });
   num.step = step;
   const refresh = () => {
@@ -470,8 +471,9 @@ function whithamNote() {
   let i = 1;
   while (i < P.length - 1 && P[i].s < s) i++;
   const f = P[i].s > P[i - 1].s ? Math.min(1, Math.max(0, (s - P[i - 1].s) / (P[i].s - P[i - 1].s))) : 0;
-  const lines = [`𝒲 = ${fmt(P[i - 1].W + f * (P[i].W - P[i - 1].W), 4)}`];
-  for (const c of F.critical) lines.push(`𝒲 critical at s = ${fmt(P[c].s, 3)}, 𝒲 = ${fmt(P[c].W, 4)}`);
+  const Ws = P.map((p) => p.W);
+  const lines = [`𝒲 = ${fmt(P[i - 1].W + f * (P[i].W - P[i - 1].W), 4)} (family: ${fmt(Math.min(...Ws), 3)} … ${fmt(Math.max(...Ws), 3)})`];
+  for (const c of F.critical) lines.push(`𝒲 critical: 𝒲 = ${fmt(P[c].W, 4)}`);
   $('whithamNote').textContent = lines.join('\n');
 }
 
@@ -553,7 +555,7 @@ function whithamMove(s) {
   return r.s;
 }
 const whithamSlider = slider($('whithamRow'), {
-  label: '', min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
+  label: '', number: false, min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
   set: (v) => { whithamMove(v); },
   play: { key: 'whitham' },
 });

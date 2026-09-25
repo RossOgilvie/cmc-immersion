@@ -10,7 +10,7 @@
 // (unduloid for alpha on the far side, nodoid on the near side), and alpha snaps onto it.
 // Double-click on empty space adds a branch point; double-click on a branch point removes it.
 // If given a Whitham family, draws the path of each branch point along it, coloured by the Willmore
-// functional W (blue low, red high), with small rings at the critical points of W.
+// functional W (blue low, red high), with a tick across the path at the critical points of W.
 
 const R_VIEW = 1.55;       // half-width of the view in lambda units
 const R_MIN = 0.03, R_MAX = 0.97;
@@ -192,20 +192,16 @@ export class SpectralWidget {
         ctx.strokeStyle = ramp(((P[i - 1].W + P[i].W) / 2 - lo) / span);
         ctx.beginPath(); ctx.moveTo(...px[i - 1]); ctx.lineTo(...px[i]); ctx.stroke();
       }
-      // a bar where the curve leaves the allowed region
-      for (const [end, i0, i1] of [[F.ends && F.ends.neg, 0, 1], [F.ends && F.ends.pos, P.length - 1, P.length - 2]]) {
-        if (!end) continue;
-        let dx = px[i0][0] - px[i1][0], dy = px[i0][1] - px[i1][1];
-        const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
-        ctx.strokeStyle = 'rgba(43,38,32,0.75)';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(px[i0][0] - dy * 5, px[i0][1] + dx * 5); ctx.lineTo(px[i0][0] + dy * 5, px[i0][1] - dx * 5); ctx.stroke();
-      }
-      // critical points of W
-      ctx.lineWidth = 1.5;
+      // critical points of W: a short tick across the path
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.6;
       ctx.strokeStyle = 'rgba(43,38,32,0.9)';
       for (const c of F.critical || []) {
-        ctx.beginPath(); ctx.arc(...px[c], 3.25, 0, 2 * Math.PI); ctx.stroke();
+        const a = px[Math.max(0, c - 1)], b = px[Math.min(P.length - 1, c + 1)];
+        let dx = b[0] - a[0], dy = b[1] - a[1];
+        const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+        const [x, y] = px[c];
+        ctx.beginPath(); ctx.moveTo(x - dy * 5, y + dx * 5); ctx.lineTo(x + dy * 5, y - dx * 5); ctx.stroke();
       }
     }
     ctx.restore();
