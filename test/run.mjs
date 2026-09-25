@@ -6,7 +6,7 @@ import {
   aPoly, kappa0, killingField, flowKilling, isospectralBasis, divisor, FrameIntegrator,
   computeSurface, hopfArg, closingInfo,
 } from '../src/cmc/cmc.js';
-import { periodVector, periodLattice } from '../src/cmc/periods.js';
+import { periodVector, periodLattice, commonRootsOnCircle } from '../src/cmc/periods.js';
 import { WhithamCurve } from '../src/cmc/whitham.js';
 
 let failures = 0;
@@ -223,6 +223,12 @@ for (const [name, al] of [
   const e = 1e-3, w = (s) => C.willmore(C.at(s))[0];
   check('dW/ds = 0 at the Wente torus (relative to the change over 0.2)',
     Math.abs((w(e) - w(-e)) / (2 * e)) / Math.abs((w(0.2) - w(0)) / 0.2), 1e-3);
+}
+{
+  // common roots of B_a on S^1: the Wente torus has one at its Sym point lam0 = 1, generic data none
+  const W = commonRootsOnCircle([[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]], 1e-5);
+  check('Wente: common root of the differentials at lam = 1', W.length === 1 ? Math.hypot(W[0].lam[0] - 1, W[0].lam[1]) : Infinity, 1e-9);
+  check('generic genus 2: no common root', commonRootsOnCircle([[0.4, 0.25], [-0.3, 0.5]], 1e-5).length, 0);
 }
 {
   // genus 3 (generally no lattice): the curve continues and keeps [ell] in CP^2 fixed

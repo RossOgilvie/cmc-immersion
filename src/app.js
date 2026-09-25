@@ -4,6 +4,7 @@ import { Viewer } from './viewer.js';
 import { SpectralWidget, MAX_GENUS } from './spectral-widget.js';
 import { shapeFlows, kappa0, hopfArg } from './cmc/cmc.js';
 import { WhithamCurve } from './cmc/whitham.js';
+import { commonRootsOnCircle } from './cmc/periods.js';
 
 const $ = (id) => document.getElementById(id);
 const polar = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
@@ -39,7 +40,7 @@ const PRESETS = [
 ];
 
 const state = {
-  alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: PI / 2,
+  alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: 0,
   ...VIEW_DEFAULTS, width: 6, height: 6,
   res: 240, hmax: 0.05, colour: 'side', grid: true, H: 0.5, adapt: true,
   front: '#6f8fb0', back: '#e8c9a0', bg: '#f5f0e4',
@@ -201,6 +202,7 @@ function onResult(e) {
 function changed(dragging = false) {
   whithamCheckAnchor();
   requestFamily();
+  updateCommonRoots();
   request(false);
   clearTimeout(fullTimer);
   fullTimer = setTimeout(() => request(true), dragging || anim ? 350 : 0);
@@ -438,6 +440,17 @@ const Hslider = slider($('Hrow'), {
   recompute: false,
 });
 
+// ------------------------------------------------------------------ common roots of the differentials on S^1
+
+// where every Theta_w vanishes: a Sym point there has no translational period in any direction
+function updateCommonRoots() {
+  let roots = [];
+  if (genus() >= 1) {
+    try { roots = commonRootsOnCircle(state.alphas, 1e-5).map((r) => r.lam); } catch { roots = []; }
+  }
+  widget.set({ commonRoots: roots });
+}
+
 // ------------------------------------------------------------------ Whitham deformation
 
 // curve: the Whitham curve through the anchor (created lazily); key: the alphas it last produced, so
@@ -534,6 +547,7 @@ function whithamMove(s) {
       width: state.width * m, height: state.height * m,
     };
   }
+  s = snapToCritical(s);
   const r = whitham.curve.at(s);
   state.alphas = r.alphas;
   whitham.s = r.s;
@@ -553,6 +567,32 @@ function whithamMove(s) {
   refreshAlphaValues();
   whithamNote();
   return r.s;
+}
+// The critical points of W along the family (the ticks) are where B_a has a common root, a
+// codimension-one condition, so the slider snaps onto them. Their positions come from the coarse
+// family and are refined on the accurate curve (golden section on W), once per family.
+function criticalPoints() {
+  const F = family.data;
+  if (!F || !whitham.curve || !F.critical.length) return [];
+  if (whitham.critical && whitham.critical.family === F && whitham.critical.curve === whitham.curve) return whitham.critical.s;
+  const W = (t) => whitham.curve.willmore(whitham.curve.at(t))[0];
+  const list = F.critical.map((c) => {
+    const P = F.points, sign = P[c].W > P[c - 1].W ? 1 : -1; // maximum or minimum
+    let a = P[c - 1].s, b = P[c + 1].s;
+    const gr = (Math.sqrt(5) - 1) / 2;
+    let x1 = b - gr * (b - a), x2 = a + gr * (b - a), f1 = sign * W(x1), f2 = sign * W(x2);
+    for (let it = 0; it < 40 && b - a > 1e-9; it++) {
+      if (f1 > f2) { b = x2; x2 = x1; f2 = f1; x1 = b - gr * (b - a); f1 = sign * W(x1); }
+      else { a = x1; x1 = x2; f1 = f2; x2 = a + gr * (b - a); f2 = sign * W(x2); }
+    }
+    return (a + b) / 2;
+  });
+  whitham.critical = { family: F, curve: whitham.curve, s: list };
+  return list;
+}
+function snapToCritical(s) {
+  for (const sc of criticalPoints()) if (Math.abs(s - sc) < 0.03) return sc;
+  return s;
 }
 const whithamSlider = slider($('whithamRow'), {
   label: '', number: false, min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,

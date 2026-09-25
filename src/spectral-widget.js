@@ -1,7 +1,8 @@
 // Interactive editor for the spectral data in the lambda-plane.
 //
 //  - branch points alpha_i: filled dots, draggable within the punctured unit disc
-//  - Sym point lam0 = e^{i theta0}: a diamond, draggable along the unit circle
+//  - Sym point lam0 = e^{i theta0}: a red dot, draggable along the unit circle; it snaps onto
+//  - common roots on S^1 of the differentials Theta_w: small red diamonds
 //  - reflections 1/conj(alpha_i): faint rings (read-only)
 //  - divisor points mu_j: hollow blue rings (read-only), clamped to the edge with an arrow if far out
 //
@@ -25,6 +26,7 @@ export class SpectralWidget {
     this.alphas = [];
     this.theta0 = 0;
     this.divisor = [];
+    this.commonRoots = [];
     this.drag = null;
     this.hover = null;
     this.colours = {};
@@ -39,6 +41,7 @@ export class SpectralWidget {
     if (theta0 !== undefined) this.theta0 = theta0;
     if (divisor) this.divisor = divisor;
     if ('family' in opts) this.family = opts.family;
+    if ('commonRoots' in opts) this.commonRoots = opts.commonRoots || [];
     this.draw();
   }
 
@@ -117,6 +120,11 @@ export class SpectralWidget {
         this.alphas[d.i] = this._snap([r * Math.cos(t), r * Math.sin(t)]);
       } else if (d.kind === 'lam') {
         this.theta0 = Math.atan2(z[1], z[0]);
+        // snap onto a common root of the differentials (hold alt to avoid)
+        for (const [re, im] of this.commonRoots) {
+          const p = this._toPx([re, im]), q = this._toPx([Math.cos(this.theta0), Math.sin(this.theta0)]);
+          if (!this.noSnap && Math.hypot(p[0] - q[0], p[1] - q[1]) < 8) this.theta0 = Math.atan2(im, re);
+        }
       } else if (d.kind === 'rotate') {
         const a = Math.atan2(z[1], z[0]);
         const da = a - d.ang;
@@ -322,13 +330,22 @@ export class SpectralWidget {
     // Sym point
     const lp = this._toPx([Math.cos(this.theta0), Math.sin(this.theta0)]);
     const hot = this.hover === 'lam' || (this.drag && this.drag.kind === 'lam');
-    const r = hot ? 8 : 6.5;
     ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.moveTo(lp[0], lp[1] - r); ctx.lineTo(lp[0] + r, lp[1]);
-    ctx.lineTo(lp[0], lp[1] + r); ctx.lineTo(lp[0] - r, lp[1]);
-    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(lp[0], lp[1], hot ? 6.5 : 5, 0, 2 * Math.PI); ctx.fill();
     ctx.fillText('λ₀', lp[0] + 9, lp[1] + 13);
+
+    // common roots of the differentials on S^1: small diamonds (outlined in paper, so one sitting
+    // under the Sym point still shows)
+    const paper = col('--paper', '#f5f0e4');
+    for (const [re, im] of this.commonRoots) {
+      const p = this._toPx([re, im]), r = 3.8;
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1] - r); ctx.lineTo(p[0] + r, p[1]);
+      ctx.lineTo(p[0], p[1] + r); ctx.lineTo(p[0] - r, p[1]);
+      ctx.closePath();
+      ctx.fillStyle = accent; ctx.fill();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = paper; ctx.stroke();
+    }
   }
 }
 

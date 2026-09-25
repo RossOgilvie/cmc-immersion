@@ -6,7 +6,7 @@
 // and the g middle coefficients fixed by Re oint_gamma Theta_w = 0 on all cycles.
 // w is a period of zeta iff oint_gamma Theta_w lies in 2 pi i Z for all cycles.
 
-import { polyEval } from './poly.js';
+import { polyEval, polyRoots } from './poly.js';
 import { aPoly, kappa0 } from './cmc.js';
 
 /**
@@ -180,4 +180,25 @@ function solve(A, b, n) {
     }
   }
   return M.map((r, i) => r[n] / r[i]);
+}
+
+/**
+ * Common roots on the unit circle of the differentials B_a = { p_w } (§9: the Sym points where
+ * no translational period arises in any direction). By the reality condition the roots of p_1 on
+ * S^1 are stable; a common root is one of them where p_i vanishes too.
+ * Returns [{ lam: [re, im], defect }] with defect = |p_i(lam)| / max|coefficients of p_i| < tol.
+ */
+export function commonRootsOnCircle(alphas, tol = 1e-6, periods = basicPeriods(alphas)) {
+  if (alphas.length < 1) return [];
+  const p1 = thetaPoly(alphas, [1, 0], periods), pi = thetaPoly(alphas, [0, 1], periods);
+  const c1 = Float64Array.from(p1.flat()), ci = Float64Array.from(pi.flat());
+  const scale = Math.max(...pi.map(([re, im]) => Math.hypot(re, im)));
+  const out = [];
+  for (const [re, im] of polyRoots(c1)) {
+    if (Math.abs(Math.hypot(re, im) - 1) > 1e-6) continue;
+    const [vr, vi] = polyEval(ci, re, im);
+    const defect = Math.hypot(vr, vi) / scale;
+    if (defect < tol) out.push({ lam: [re, im], defect });
+  }
+  return out;
 }
