@@ -137,17 +137,24 @@ export class WhithamCurve {
       res = Math.hypot(...eq.G);
       const b = [...eq.G.map((v) => -v), -dot(ta, y.map((v, i) => v - yp[i]))];
       const dy = solve(A, b, m);
-      if (!dy.every(Number.isFinite)) return null;
+      if (!dy.every(Number.isFinite)) { this.fail = 'newton'; return null; }
       for (let i = 0; i < m; i++) y[i] += dy[i];
       // an iterate outside the disc can't converge to an admissible point (and its periods are costly)
-      for (let j = 0; j < n; j += 2) { const r = Math.hypot(y[j], y[j + 1]); if (!(r > 1e-4 && r < 0.9999)) return null; }
+      for (let j = 0; j < n; j += 2) {
+        const r = Math.hypot(y[j], y[j + 1]);
+        if (!(r > 1e-4 && r < 0.9999)) { this.fail = r >= 0.9999 ? 'circle' : 'zero'; return null; }
+      }
       if (Math.hypot(...dy) < tol && res < tol) break;
     }
-    if (!(res < Math.max(1e-9, 10 * tol))) return null;
+    if (!(res < Math.max(1e-9, 10 * tol))) { this.fail = 'newton'; return null; }
     const alphas = toAlphas(y.slice(0, n));
-    const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 0.02 || r > 0.98; })
-      || alphas.some((a, i) => alphas.some((c, j) => j > i && Math.hypot(a[0] - c[0], a[1] - c[1]) < 2e-3));
-    if (bad) return null;
+    const rs = alphas.map(([re, im]) => Math.hypot(re, im));
+    if (rs.some((r) => r > 0.98)) { this.fail = 'circle'; return null; }
+    if (rs.some((r) => r < 0.02)) { this.fail = 'zero'; return null; }
+    if (alphas.some((a, i) => alphas.some((c, j) => j > i && Math.hypot(a[0] - c[0], a[1] - c[1]) < 2e-3))) {
+      this.fail = 'collision';
+      return null;
+    }
     const J = this.jacobian(y, ell);
     let t = this.tangent(J);
     if (dot(t, p.t) < 0) t = t.map((v) => -v);
@@ -167,9 +174,31 @@ export class WhithamCurve {
       const q = this.step(pts[pts.length - 1], dir * h, tol);
       if (q) { pts.push(q); steps++; h = Math.min(this.h, h * 1.5); }
       else if (h > this.h / 64) h /= 4;
-      else pts.done = true;
+      else { pts.done = true; pts.why = this.endReason(pts[pts.length - 1], this.fail); }
     }
     return pts;
+  }
+
+  /**
+   * Why the curve ends after point p, given how the last step failed: { kind, idx } with kind 'circle'
+   * (the branch points idx reach the unit circle), 'zero' (they reach 0), 'collision' (the two branch
+   * points idx meet inside the disc: a singular spectral curve) or 'other'. When the corrector just fails
+   * to converge, the nearest of these obstacles is named if it is close.
+   */
+  endReason(p, fail) {
+    const al = this.describe(p).alphas, rs = al.map(([re, im]) => Math.hypot(re, im));
+    const iMax = rs.indexOf(Math.max(...rs)), iMin = rs.indexOf(Math.min(...rs));
+    let pair = null;
+    for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
+      const d = Math.hypot(al[i][0] - al[j][0], al[i][1] - al[j][1]);
+      if (!pair || d < pair.d) pair = { i, j, d };
+    }
+    // every branch point about as close to the obstacle as the closest one
+    const near = (dist) => { const d = rs.map(dist), m = Math.min(...d); return d.map((v, i) => (v < 1.5 * m + 0.005 ? i : -1)).filter((i) => i >= 0); };
+    if (fail === 'circle' || (fail === 'newton' && rs[iMax] > 0.95)) return { kind: 'circle', idx: near((r) => 1 - r) };
+    if (fail === 'zero' || (fail === 'newton' && rs[iMin] < 0.05)) return { kind: 'zero', idx: near((r) => r) };
+    if (fail === 'collision' || (fail === 'newton' && pair && pair.d < 0.02)) return { kind: 'collision', idx: [pair.i, pair.j] };
+    return { kind: 'other', idx: [] };
   }
 
   at(s) {
@@ -197,7 +226,7 @@ export class WhithamCurve {
 
   /**
    * Both branches up to |s| <= smax (at most maxSteps each), as [{ s, alphas, z, W }] sorted by s,
-   * plus the critical points of W (sign changes of its differences).
+   * plus the critical points of W (sign changes of its differences) and why each end is an end.
    */
   trace(smax = 1.5, maxSteps = 80, tol = 1e-8) {
     const neg = this.extend(-1, smax, maxSteps, tol), pos = this.extend(1, smax, maxSteps, tol);
@@ -210,7 +239,8 @@ export class WhithamCurve {
       const a = pts[i].W - pts[i - 1].W, b = pts[i + 1].W - pts[i].W;
       if (a * b < 0) critical.push(i);
     }
-    return { points: pts, critical, ends: { neg: !!neg.done, pos: !!pos.done } };
+    // ends: why each branch stops (see endReason), or null where it was only cut off at smax / maxSteps
+    return { points: pts, critical, ends: { neg: neg.done ? neg.why : null, pos: pos.done ? pos.why : null } };
   }
 }
 

@@ -820,6 +820,24 @@ const WHITHAM_RANGE = [-1.5, 1.5]; // until the first family arrives
 function showFamily() {
   widget.set({ family: $('showFamily').checked ? family.data : null });
 }
+// Why the family ends at each end of the slider (from the trace; see WhithamCurve.endReason).
+function endText(e) {
+  const g = genus(), a = (i) => `α<sub>${i + 1}</sub>`;
+  if (e === undefined) return '…';
+  if (e === null) return 'beyond the traced range';
+  const who = e.idx.length === g && g > 1 ? 'all branch points' : e.idx.map(a).join(', ');
+  const plural = e.idx.length > 1;
+  if (e.kind === 'circle') return `${who} ${plural ? 'reach' : 'reaches'} the unit circle`;
+  if (e.kind === 'zero') return `${who} ${plural ? 'reach' : 'reaches'} 0`;
+  if (e.kind === 'collision') return `${a(e.idx[0])} and ${a(e.idx[1])} meet (singular spectral curve)`;
+  return 'the continuation fails (other)';
+}
+function showEnds() {
+  const E = genus() >= 2 && family.data ? family.data.ends : undefined;
+  $('endL').innerHTML = genus() < 2 ? '–' : endText(E && E.neg);
+  $('endR').innerHTML = genus() < 2 ? '–' : endText(E && E.pos);
+}
+
 function familyRange() {
   const P = family.data && family.data.points;
   return P && P.length > 1 ? [P[0].s, P[P.length - 1].s] : WHITHAM_RANGE;
@@ -828,6 +846,7 @@ function requestFamily() {
   if (genus() < 2) {
     family.pending = null;
     if (family.data) { family.data = null; family.key = null; showFamily(); }
+    showEnds();
     return;
   }
   const key = JSON.stringify(state.alphas);
@@ -846,6 +865,7 @@ function pumpFamily() {
       // show every result, even if a newer request is queued: during a drag that keeps the paths live
       if (genus() >= 2) {
         family.data = error ? null : result;
+        showEnds();
         showFamily();
         toRootState();
         whithamSlider.setRange(...familyRange());
