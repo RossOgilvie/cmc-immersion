@@ -426,7 +426,7 @@ function recolour() {
   viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
 }
 const Hslider = slider($('Hrow'), {
-  label: 'mean curv. H', min: 0.05, max: 3, step: 0.01, get: () => state.H,
+  label: 'H', min: 0.05, max: 3, step: 0.01, get: () => state.H,
   set: (v) => {
     state.H = Math.max(0.01, v);
     viewer.setScale(1 / (2 * state.H));
@@ -504,7 +504,7 @@ function whithamMove(s) {
   return r.s;
 }
 const whithamSlider = slider($('whithamRow'), {
-  label: 'Whitham s', min: -0.5, max: 0.5, step: 0.002, get: () => whitham.s,
+  label: 'Whitham s', min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
   set: (v) => { whithamMove(v); },
   play: { key: 'whitham' },
 });
@@ -599,9 +599,9 @@ function animStep(now) {
   } else if (anim.key === 'whitham') {
     if (!busy) {
       anim.dir = anim.dir || 1;
-      const want = whitham.s + anim.dir * 0.05 * dt;
-      const got = whithamMove(Math.max(-0.5, Math.min(0.5, want)));
-      if (Math.abs(got - want) > 1e-9 || Math.abs(got) >= 0.5) anim.dir = -anim.dir;
+      const want = whitham.s + anim.dir * 0.15 * dt;
+      const got = whithamMove(Math.max(-1.5, Math.min(1.5, want)));
+      if (Math.abs(got - want) > 1e-9 || Math.abs(got) >= 1.5) anim.dir = -anim.dir;
       whithamSlider.refresh();
     }
   } else {
