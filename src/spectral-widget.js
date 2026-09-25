@@ -1,28 +1,32 @@
 // Interactive editor for the spectral data in the lambda-plane.
 //
-//  - branch points alpha_i: filled dots, draggable within the punctured unit disc
-//  - Sym point lam0 = e^{i theta0}: a red dot, draggable along the unit circle; it snaps onto
-//  - common roots on S^1 of the differentials Theta_w: small red diamonds
+//  - branch points alpha_i: filled dots, draggable within the punctured unit disc; the selected one
+//    carries a ring (clicking or dragging a point selects it)
+//  - Sym point lam0 = e^{i theta0}: a rust dot, draggable along the unit circle; it snaps onto
+//  - common roots on S^1 of the differentials Theta_w: small rust diamonds
 //  - reflections 1/conj(alpha_i): faint rings (read-only)
-//  - divisor points mu_j: hollow blue rings (read-only), clamped to the edge with an arrow if far out
+//  - divisor points mu_j: hollow grey rings (read-only), clamped to the edge with an arrow if far out
 //
 // Shift+drag rotates all alpha_i and lam0 together (a rotation of the z-plane: same surface, turned).
 // In genus 1 the diameter through lam0 is drawn: there the surface closes into a Delaunay cylinder
 // (unduloid for alpha on the far side, nodoid on the near side), and alpha snaps onto it.
 // Double-click on empty space adds a branch point; double-click on a branch point removes it.
 // If given a Whitham family, draws the path of each branch point along it, coloured by the Willmore
-// functional W (blue low, red high), with a tick across the path at the critical points of W.
+// functional W (blue low, rust high), with a tick across the path at the critical points of W.
+// Labels sit on the side of each point away from the origin and from its own trail.
 
-const R_VIEW = 1.55;       // half-width of the view in lambda units
+const R_VIEW = 1.25;       // half-width of the view in lambda units
 const R_MIN = 0.03, R_MAX = 0.97;
 export const MAX_GENUS = 8;
 
 export class SpectralWidget {
-  /** onChange(state, dragging) with state = { alphas, theta0 } */
-  constructor(canvas, onChange) {
+  /** onChange(state, dragging) with state = { alphas, theta0 }; onSelect(i) when a branch point is picked */
+  constructor(canvas, onChange, onSelect = () => {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.onChange = onChange;
+    this.onSelect = onSelect;
+    this.selected = -1;
     this.alphas = [];
     this.theta0 = 0;
     this.divisor = [];
@@ -32,6 +36,8 @@ export class SpectralWidget {
     this.colours = {};
     this._bind();
     new ResizeObserver(() => this.draw()).observe(canvas);
+    // canvas text doesn't trigger web-font loading, and draws in the fallback until the font is in
+    if (document.fonts) document.fonts.load("16px 'EB Garamond'", 'αλ01').then(() => this.draw(), () => {});
   }
 
   /** family: { points: [{ s, alphas, W }], critical: [indices], ends: { neg, pos } } or null */
@@ -42,6 +48,7 @@ export class SpectralWidget {
     if (divisor) this.divisor = divisor;
     if ('family' in opts) this.family = opts.family;
     if ('commonRoots' in opts) this.commonRoots = opts.commonRoots || [];
+    if ('selected' in opts) this.selected = opts.selected;
     this.draw();
   }
 
@@ -96,6 +103,7 @@ export class SpectralWidget {
         this.drag = { kind: 'rotate', ang: Math.atan2(z[1], z[0]) };
       } else if (hit) {
         this.drag = hit;
+        if (hit.kind === 'alpha' && hit.i !== this.selected) { this.selected = hit.i; this.onSelect(hit.i); this.draw(); }
       } else {
         return;
       }
@@ -150,6 +158,8 @@ export class SpectralWidget {
       const hit = this._pick(x, y);
       if (hit && hit.kind === 'alpha') {
         this.alphas.splice(hit.i, 1);
+        this.selected = Math.min(hit.i, this.alphas.length - 1);
+        this.onSelect(this.selected);
       } else if (!hit) {
         const z = this._fromPx(x, y);
         const r = Math.hypot(z[0], z[1]);
@@ -157,6 +167,8 @@ export class SpectralWidget {
         const rr = Math.min(R_MAX, Math.max(R_MIN, r));
         const t = Math.atan2(z[1], z[0]);
         this.alphas.push([rr * Math.cos(t), rr * Math.sin(t)]);
+        this.selected = this.alphas.length - 1;
+        this.onSelect(this.selected);
       } else {
         return;
       }
@@ -178,23 +190,23 @@ export class SpectralWidget {
 
   // ---------------------------------------------------------------- drawing
 
-  _drawFamily(ctx) {
+  _drawFamily(ctx, ink) {
+    this._trails = null;
     const F = this.family;
     if (!F || !F.points || F.points.length < 2) return;
     const P = F.points, g = P[0].alphas.length;
     if (g !== this.alphas.length) return; // stale (genus changed)
     const Ws = P.map((p) => p.W);
     const lo = Math.min(...Ws), hi = Math.max(...Ws), span = hi - lo || 1;
-    const ramp = (t) => { // blue - paper - red
-      const c0 = [47, 95, 158], c1 = [222, 210, 186], c2 = [170, 62, 38];
-      const [a, b, u] = t < 0.5 ? [c0, c1, 2 * t] : [c1, c2, 2 * t - 1];
-      return `rgb(${a.map((v, i) => Math.round(v + u * (b[i] - v))).join(',')})`;
-    };
+    const c0 = rgb(this._col('--blue', '#3D5A80')), c1 = rgb(this._col('--accent', '#9E3F24'));
+    const ramp = (t) => `rgb(${c0.map((v, i) => Math.round(v + t * (c1[i] - v))).join(',')})`; // blue low, rust high
+    this._trails = [];
     ctx.save();
     ctx.lineCap = 'round';
     for (let j = 0; j < g; j++) {
       const px = P.map((p) => this._toPx(p.alphas[j]));
-      ctx.lineWidth = 3;
+      this._trails.push(px);
+      ctx.lineWidth = 2.4;
       ctx.globalAlpha = 0.85;
       for (let i = 1; i < P.length; i++) {
         ctx.strokeStyle = ramp(((P[i - 1].W + P[i].W) / 2 - lo) / span);
@@ -203,7 +215,7 @@ export class SpectralWidget {
       // critical points of W: a short tick across the path
       ctx.globalAlpha = 1;
       ctx.lineWidth = 1.6;
-      ctx.strokeStyle = 'rgba(43,38,32,0.9)';
+      ctx.strokeStyle = ink;
       for (const c of F.critical || []) {
         const a = px[Math.max(0, c - 1)], b = px[Math.min(P.length - 1, c + 1)];
         let dx = b[0] - a[0], dy = b[1] - a[1];
@@ -223,10 +235,9 @@ export class SpectralWidget {
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const { w, h, s, cx, cy } = this._geom();
-    const css = getComputedStyle(c);
-    const col = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
-    const ink = col('--ink', '#2b2620'), rule = col('--rule', '#c9bfa6'), accent = col('--accent', '#a4472a');
-    const disc = col('--disc', 'rgba(0,0,0,0.03)'), divc = col('--divisor', '#2f5f9e');
+    const ink = this._col('--ink', '#27231E'), muted = this._col('--muted', '#6A6257');
+    const rule = this._col('--rule', '#CFC5B0'), accent = this._col('--accent', '#9E3F24');
+    const paper = this._col('--paper', '#F2EEE3'), disc = this._col('--disc', 'rgba(234,228,214,0.55)');
     ctx.clearRect(0, 0, w, h);
 
     // axes and circles
@@ -241,24 +252,26 @@ export class SpectralWidget {
     ctx.beginPath(); ctx.arc(cx, cy, 0.5 * s, 0, 2 * Math.PI); ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = ink;
-    ctx.lineWidth = 1.3;
+    ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(cx, cy, s, 0, 2 * Math.PI); ctx.stroke();
 
     // genus 1: the Delaunay diameter
     if (this.alphas.length === 1) {
       const ur = Math.cos(this.theta0), ui = Math.sin(this.theta0);
       ctx.save();
-      ctx.strokeStyle = accent;
-      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = muted;
+      ctx.globalAlpha = 0.7;
       ctx.setLineDash([5, 4]);
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(cx - ur * s, cy + ui * s); ctx.lineTo(cx + ur * s, cy - ui * s);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = accent;
-      ctx.font = 'italic 10.5px Georgia, serif';
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = muted;
+      ctx.font = `italic 13px ${FONT}`;
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
       const lab = (t, txt) => {
         ctx.save();
         ctx.translate(cx + t * ur * s, cy - t * ui * s);
@@ -273,17 +286,18 @@ export class SpectralWidget {
       ctx.restore();
     }
 
-    // branch point at 0
-    ctx.lineWidth = 1.5;
+    // branch point at 0: a small grey cross
+    ctx.strokeStyle = muted;
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    ctx.moveTo(cx - 4, cy - 4); ctx.lineTo(cx + 4, cy + 4);
-    ctx.moveTo(cx - 4, cy + 4); ctx.lineTo(cx + 4, cy - 4);
+    ctx.moveTo(cx - 3, cy - 3); ctx.lineTo(cx + 3, cy + 3);
+    ctx.moveTo(cx - 3, cy + 3); ctx.lineTo(cx + 3, cy - 3);
     ctx.stroke();
 
-    ctx.font = '11px Georgia, serif';
     // reflections 1/conj(alpha)
     ctx.strokeStyle = ink;
-    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.3;
     for (const [re, im] of this.alphas) {
       const r2 = re * re + im * im;
       const p = this._toPx([re / r2, im / r2]);
@@ -293,9 +307,9 @@ export class SpectralWidget {
     ctx.globalAlpha = 1;
 
     // divisor
-    ctx.strokeStyle = divc;
-    ctx.fillStyle = divc;
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = muted;
+    ctx.fillStyle = muted;
+    ctx.lineWidth = 1.3;
     for (const { mu } of this.divisor) {
       let p = this._toPx(mu);
       const m = 8;
@@ -316,27 +330,34 @@ export class SpectralWidget {
       }
     }
 
-    this._drawFamily(ctx);
+    this._drawFamily(ctx, ink);
 
-    // branch points
-    this.alphas.forEach((a, i) => {
-      const p = this._toPx(a);
+    // branch points, the selected one ringed
+    const lp = this._toPx([Math.cos(this.theta0), Math.sin(this.theta0)]);
+    const pts = this.alphas.map((a) => this._toPx(a));
+    pts.forEach((p, i) => {
       const hot = this.hover === `alpha${i}` || (this.drag && this.drag.i === i);
       ctx.fillStyle = ink;
-      ctx.beginPath(); ctx.arc(p[0], p[1], hot ? 6 : 4.5, 0, 2 * Math.PI); ctx.fill();
-      ctx.fillText(`α${sub(i + 1)}`, p[0] + 7, p[1] - 6);
+      ctx.beginPath(); ctx.arc(p[0], p[1], hot ? 6 : 5, 0, 2 * Math.PI); ctx.fill();
+      if (i === this.selected) {
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 2 * Math.PI); ctx.stroke();
+      }
+    });
+    pts.forEach((p, i) => {
+      const others = [...pts.filter((_, j) => j !== i), lp];
+      this._label(ctx, 'α', String(i + 1), p, this._labelDir(p, i, others), ink, i === this.selected ? 12 : 9);
     });
 
-    // Sym point
-    const lp = this._toPx([Math.cos(this.theta0), Math.sin(this.theta0)]);
+    // Sym point, labelled outside the circle
     const hot = this.hover === 'lam' || (this.drag && this.drag.kind === 'lam');
     ctx.fillStyle = accent;
     ctx.beginPath(); ctx.arc(lp[0], lp[1], hot ? 6.5 : 5, 0, 2 * Math.PI); ctx.fill();
-    ctx.fillText('λ₀', lp[0] + 9, lp[1] + 13);
+    this._label(ctx, 'λ', '0', lp, [Math.cos(this.theta0), -Math.sin(this.theta0)], accent, 9);
 
     // common roots of the differentials on S^1: small diamonds (outlined in paper, so one sitting
     // under the Sym point still shows)
-    const paper = col('--paper', '#f5f0e4');
     for (const [re, im] of this.commonRoots) {
       const p = this._toPx([re, im]), r = 3.8;
       ctx.beginPath();
@@ -347,8 +368,70 @@ export class SpectralWidget {
       ctx.lineWidth = 1.2; ctx.strokeStyle = paper; ctx.stroke();
     }
   }
+
+  _col(name, fallback) {
+    return getComputedStyle(this.canvas).getPropertyValue(name).trim() || fallback;
+  }
+
+  /**
+   * Unit vector (pixel coordinates) for the label of the branch point at p: away from the origin, and
+   * clear of its own trail and of nearby points.
+   */
+  _labelDir(p, i, others) {
+    const { cx, cy } = this._geom();
+    const avoid = []; // [ux, uy, weight]
+    const trail = this._trails && this._trails[i];
+    if (trail) {
+      // the trail leaves the point in up to two directions: look ~14px along it on either side
+      let k = 0, bd = Infinity;
+      trail.forEach((q, m) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; k = m; } });
+      for (const dir of [-1, 1]) {
+        for (let m = k + dir; m >= 0 && m < trail.length; m += dir) {
+          const dx = trail[m][0] - p[0], dy = trail[m][1] - p[1], d = Math.hypot(dx, dy);
+          if (d >= 14) { avoid.push([dx / d, dy / d, 1.6]); break; }
+        }
+      }
+    }
+    for (const q of others) {
+      const dx = q[0] - p[0], dy = q[1] - p[1], d = Math.hypot(dx, dy);
+      if (d > 0 && d < 40) avoid.push([dx / d, dy / d, 0.9]);
+    }
+    const rx = p[0] - cx, ry = p[1] - cy, rl = Math.hypot(rx, ry);
+    const radial = rl > 1 ? Math.atan2(ry, rx) : -Math.PI / 4;
+    let best = [1, 0], bs = -Infinity;
+    for (let k = 0; k < 24; k++) {
+      const t = (k * Math.PI) / 12, u = [Math.cos(t), Math.sin(t)];
+      let sc = Math.cos(t - radial);
+      for (const [ax, ay, wt] of avoid) sc -= wt * Math.max(0, u[0] * ax + u[1] * ay);
+      if (sc > bs) { bs = sc; best = u; }
+    }
+    return best;
+  }
+
+  /** Draws base with a subscript, centred gap px beyond p in the direction u. */
+  _label(ctx, base, subText, p, u, colour, gap) {
+    ctx.font = `16px ${FONT}`;
+    const wb = ctx.measureText(base).width;
+    ctx.font = `11px ${FONT}`;
+    const ws = ctx.measureText(subText).width;
+    const wd = wb + ws, ht = 13;
+    const d = gap + Math.abs(u[0]) * wd / 2 + Math.abs(u[1]) * ht / 2;
+    const x = p[0] + u[0] * d - wd / 2, y = p[1] + u[1] * d;
+    ctx.fillStyle = colour;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `16px ${FONT}`;
+    ctx.fillText(base, x, y);
+    ctx.font = `11px ${FONT}`;
+    ctx.fillText(subText, x + wb, y + 4);
+  }
 }
 
-function sub(n) {
-  return String(n).replace(/\d/g, (d) => '₀₁₂₃₄₅₆₇₈₉'[d]);
+const FONT = "'EB Garamond', Georgia, serif";
+
+/** '#rrggbb' -> [r, g, b] */
+function rgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  const n = m ? parseInt(m[1], 16) : 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }

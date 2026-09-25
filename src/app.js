@@ -3,12 +3,59 @@
 import { Viewer } from './viewer.js';
 import { SpectralWidget, MAX_GENUS } from './spectral-widget.js';
 import { shapeFlows, kappa0, hopfArg } from './cmc/cmc.js';
-import { WhithamCurve } from './cmc/whitham.js';
+import { WhithamCurve, willmore } from './cmc/whitham.js';
 import { commonRootsOnCircle } from './cmc/periods.js';
 
 const $ = (id) => document.getElementById(id);
 const polar = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
 const PI = Math.PI;
+
+// ------------------------------------------------------------------ panel furniture
+
+// borderless stroke glyphs for buttons
+const GLYPH = {
+  chev: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2l3 3-3 3"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M4 2.5 L11.5 7 L4 11.5 Z" fill="currentColor"/></svg>',
+  stop: '<svg width="14" height="14" viewBox="0 0 14 14"><rect x="3.5" y="3.5" width="7" height="7" fill="currentColor"/></svg>',
+  reset: '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7.5a4.5 4.5 0 1 1-1.3-3.2"/><path d="M11.2 1.8v2.7H8.5"/></svg>',
+  plus: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6 2v8M2 6h8"/></svg>',
+  minus: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 6h8"/></svg>',
+  cross: '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>',
+};
+const glyphs = (root) => root.querySelectorAll('[data-glyph]').forEach((el) => { el.innerHTML = GLYPH[el.dataset.glyph]; });
+glyphs(document);
+
+// every section (and the help and branch-point list) collapses; the choice is remembered per browser
+{
+  let open = {};
+  try { open = JSON.parse(localStorage.getItem('cmc-open')) || {}; } catch { /* no storage */ }
+  document.querySelectorAll('.disc[aria-controls]').forEach((b) => {
+    const target = $(b.getAttribute('aria-controls'));
+    const setOpen = (v) => { b.setAttribute('aria-expanded', String(v)); target.hidden = !v; };
+    const id = target.id;
+    setOpen(id in open ? open[id] : b.getAttribute('aria-expanded') === 'true');
+    b.addEventListener('click', () => {
+      const v = b.getAttribute('aria-expanded') !== 'true';
+      setOpen(v);
+      open[id] = v;
+      try { localStorage.setItem('cmc-open', JSON.stringify(open)); } catch { /* no storage */ }
+      if (v) widget.draw(); // the canvas may have been laid out while hidden
+    });
+  });
+}
+
+/** Fixed decimals, a true minus sign, and no "−0.000". */
+function fixed(x, d) {
+  const t = Math.abs(x).toFixed(d);
+  return (x < 0 && +t !== 0 ? '−' : '') + t;
+}
+/** Number typed into a field: accepts − and a trailing π (ignored: angle fields are already in π). */
+function parseNum(str) {
+  const t = String(str).replace(/−/g, '-').replace(/π/g, '').trim();
+  if (t === '') return null;
+  const v = Number(t);
+  return Number.isFinite(v) ? v : null;
+}
 
 // ------------------------------------------------------------------ state
 
@@ -43,7 +90,7 @@ const state = {
   alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: 0,
   ...VIEW_DEFAULTS, width: 6, height: 6,
   res: 240, hmax: 0.05, colour: 'side', grid: true, H: 0.5, adapt: true,
-  front: '#6f8fb0', back: '#e8c9a0', bg: '#f5f0e4',
+  front: '#6f8fb0', back: '#e8c9a0', bg: '#f2eee3',
 };
 
 const genus = () => state.alphas.length;
@@ -201,6 +248,7 @@ function onResult(e) {
 /** Called after every state change. dragging: more changes are coming, so only preview. */
 function changed(dragging = false) {
   whithamCheckAnchor();
+  whithamSlider.refresh();
   requestFamily();
   updateCommonRoots();
   request(false);
@@ -240,7 +288,7 @@ function show(res) {
   const argQ = hopfArg(state.alphas, state.theta0);
   const size = Math.max(res.bbox[3] - res.bbox[0], res.bbox[4] - res.bbox[1], res.bbox[5] - res.bbox[2]) / (2 * state.H);
   showStatus(
-    `genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fmt(wrapPi(argQ), 3)}` +
+    `genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fixed(wrapPi(argQ) / PI, 3)}π` +
     ` · ${res.nx}×${res.ny} in ${res.stats.ms.toFixed(0)} ms · extent ${size.toPrecision(3)}` +
     (res.stats.detDefect > 1e-6 ? ` · det drift ${res.stats.detDefect.toExponential(1)}` : ''),
     false,
@@ -257,6 +305,9 @@ const wrapPi = (x) => x - 2 * PI * Math.round(x / (2 * PI));
 
 // ------------------------------------------------------------------ spectral widget and alpha list
 
+// the selected branch point (ringed in the disc, highlighted in the list; − removes it); not in the URL
+let selected = -1;
+
 const widget = new SpectralWidget($('lam'), (s, dragging) => {
   const gOld = genus();
   state.alphas = s.alphas;
@@ -264,7 +315,13 @@ const widget = new SpectralWidget($('lam'), (s, dragging) => {
   if (genus() !== gOld) genusChanged();
   else refreshAlphaValues();
   changed(dragging);
-});
+}, (i) => select(i));
+
+function select(i) {
+  selected = genus() ? Math.max(0, Math.min(genus() - 1, i)) : -1;
+  widget.set({ selected });
+  [...$('alphaList').children].forEach((row, j) => row.classList.toggle('sel', j === selected));
+}
 
 function genusChanged() {
   whithamRecentre();
@@ -273,6 +330,15 @@ function genusChanged() {
   buildAlphaList();
   buildTau();
   widget.set({ alphas: state.alphas, theta0: state.theta0, divisor: [] });
+  select(selected);
+}
+
+function removeAlpha(i) {
+  if (i < 0 || i >= genus()) return;
+  state.alphas.splice(i, 1);
+  selected = Math.min(i, genus() - 1);
+  genusChanged();
+  changed(false);
 }
 
 function buildAlphaList() {
@@ -280,28 +346,36 @@ function buildAlphaList() {
   box.innerHTML = '';
   state.alphas.forEach((_, i) => {
     const row = document.createElement('div');
-    row.className = 'alpharow';
-    row.innerHTML = `<span class="name">α<sub>${i + 1}</sub></span>
-      <label>r</label><input type="number" step="0.01" min="0.03" max="0.97" data-k="r">
-      <label>arg</label><input type="number" step="0.01" data-k="t">
-      <button type="button" title="remove">×</button>`;
+    row.className = 'bprow';
+    row.innerHTML = `<button class="disc" type="button" aria-label="Select α${i + 1}">α<sub>${i + 1}</sub></button>
+      <span class="lab">r</span><input class="num" type="text" inputmode="decimal" autocomplete="off" aria-label="Modulus of α${i + 1}">
+      <span class="lab">arg</span><input class="num" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of α${i + 1} in units of π">
+      <span class="muted">π</span>
+      <button class="gly" type="button" data-glyph="cross" aria-label="Remove α${i + 1}" title="remove"></button>`;
+    glyphs(row);
     const [r, t] = row.querySelectorAll('input');
     const update = () => {
-      const rr = Math.min(0.97, Math.max(0.03, +r.value || 0.03));
-      state.alphas[i] = polar(rr, +t.value || 0);
+      const [re, im] = state.alphas[i];
+      const rv = parseNum(r.value), tv = parseNum(t.value);
+      const rr = Math.min(0.97, Math.max(0.03, rv ?? Math.hypot(re, im)));
+      state.alphas[i] = polar(rr, tv === null ? Math.atan2(im, re) : tv * PI);
       widget.set({ alphas: state.alphas });
+      refreshAlphaValues();
       changed(false);
     };
-    r.addEventListener('change', update);
-    t.addEventListener('change', update);
-    row.querySelector('button').addEventListener('click', () => {
-      state.alphas.splice(i, 1);
-      genusChanged();
-      changed(false);
-    });
+    for (const inp of [r, t]) {
+      inp.addEventListener('change', update);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+    }
+    row.addEventListener('focusin', () => select(i));
+    row.addEventListener('click', () => select(i));
+    row.querySelector('.gly').addEventListener('click', (e) => { e.stopPropagation(); removeAlpha(i); });
     box.appendChild(row);
   });
-  $('genus').textContent = `genus ${genus()}`;
+  $('genus').textContent = String(genus());
+  $('bpCount').textContent = `(${genus()})`;
+  $('remAlpha').disabled = !genus();
+  $('addAlpha').disabled = genus() >= MAX_GENUS;
   refreshAlphaValues();
 }
 
@@ -309,17 +383,20 @@ function refreshAlphaValues() {
   const rows = $('alphaList').children;
   state.alphas.forEach(([re, im], i) => {
     const [r, t] = rows[i].querySelectorAll('input');
-    if (document.activeElement !== r) r.value = fmt(Math.hypot(re, im), 3);
-    if (document.activeElement !== t) t.value = fmt(Math.atan2(im, re), 3);
+    if (document.activeElement !== r) r.value = fixed(Math.hypot(re, im), 3);
+    if (document.activeElement !== t) t.value = fixed(Math.atan2(im, re) / PI, 3);
   });
-  if (document.activeElement !== $('theta0')) $('theta0').value = fmt(wrapPi(state.theta0), 3);
+  if (document.activeElement !== $('theta0')) $('theta0').value = fixed(wrapPi(state.theta0) / PI, 3);
 }
 
 $('theta0').addEventListener('change', () => {
-  state.theta0 = +$('theta0').value || 0;
+  const v = parseNum($('theta0').value);
+  if (v !== null) state.theta0 = wrapPi(v * PI);
   widget.set({ theta0: state.theta0 });
+  refreshAlphaValues();
   changed(false);
 });
+$('theta0').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('theta0').blur(); });
 $('addAlpha').addEventListener('click', () => {
   if (genus() >= MAX_GENUS) return;
   // place the new point where it is well separated from the others
@@ -330,49 +407,108 @@ $('addAlpha').addEventListener('click', () => {
     if (d > bestD) { bestD = d; best = z; }
   }
   state.alphas.push(best);
+  selected = genus() - 1;
   genusChanged();
   changed(false);
 });
-$('remAlpha').addEventListener('click', () => {
-  if (!genus()) return;
-  state.alphas.pop();
-  genusChanged();
-  changed(false);
-});
+$('remAlpha').addEventListener('click', () => removeAlpha(selected >= 0 ? selected : genus() - 1));
 
 // ------------------------------------------------------------------ sliders
 
-function slider(parent, { label, min, max, step, get, set, digits = 3, play, recompute = true, number = true }) {
+/**
+ * A slider row: label, track, action buttons. The value floats above the thumb (display(v), default
+ * fixed digits of v / unit plus suffix); clicking it opens a field for exact entry (enter(x) if given,
+ * else set(x * unit)). snap() lists values that get a tick on the track and catch the thumb within a
+ * few pixels. play: an animation toggle; reset: { title, onClick } for a second button.
+ */
+function slider(parent, { label, min, max, step, get, set, digits = 3, unit = 1, suffix = '', display, entry, enter,
+  snap, play, reset, recompute = true, title }) {
   const after = recompute ? changed : writeHashSoon;
+  const id = `sl${(slider.n = (slider.n || 0) + 1)}`;
   const row = document.createElement('div');
-  row.className = 'row';
-  row.innerHTML = `${label ? `<label>${label}</label>` : ''}<input type="range"><input type="number">`;
-  const [rng, num] = row.querySelectorAll('input');
-  if (!number) num.remove(); // still updated, just not shown
+  row.className = 'sl';
+  row.innerHTML = `<label for="${id}">${label}</label><div class="trk"><button type="button" class="tag" title="click to type a value"></button>` +
+    `<input type="range" class="rng" id="${id}"></div><div class="acts"></div>`;
+  const rng = row.querySelector('input'), tag = row.querySelector('.tag'), trk = row.querySelector('.trk');
+  const acts = row.querySelector('.acts');
+  if (title) row.title = title;
   Object.assign(rng, { min, max, step });
-  num.step = step;
+  const frac = (v) => Math.min(1, Math.max(0, (v - min) / (max - min)));
+  const at = (f) => `calc(6.5px + (100% - 13px) * ${f.toFixed(5)})`;
+  const text = (v) => (display ? display(v) : fixed(v / unit, digits) + suffix);
+  let ticks = [];
   const refresh = () => {
     const v = get();
     rng.value = v;
-    if (document.activeElement !== num) num.value = fmt(v, digits);
+    const f = frac(v);
+    rng.style.setProperty('--p', `${(100 * f).toFixed(3)}%`);
+    tag.textContent = text(v);
+    tag.style.left = at(f);
+    const marks = snap ? snap().filter((c) => c >= min && c <= max) : [];
+    while (ticks.length > marks.length) ticks.pop().remove();
+    while (ticks.length < marks.length) {
+      const t = document.createElement('span');
+      t.className = 'tick';
+      trk.appendChild(t);
+      ticks.push(t);
+    }
+    marks.forEach((c, k) => { ticks[k].style.left = at(frac(c)); });
   };
-  rng.addEventListener('input', () => { set(+rng.value); refresh(); after(true); });
-  num.addEventListener('change', () => {
-    const v = +num.value;
-    if (!Number.isFinite(v)) return;
+  rng.addEventListener('input', () => {
+    let v = +rng.value;
+    if (snap) {
+      const px = (rng.clientWidth - 13) / (max - min);
+      for (const c of snap()) if (Math.abs(v - c) * px < 6) v = c;
+    }
     set(v);
     refresh();
-    after(false);
+    after(true);
   });
-  if (play) {
+  tag.addEventListener('click', () => {
+    const inp = document.createElement('input');
+    inp.className = 'num tagin';
+    inp.type = 'text';
+    inp.inputMode = 'decimal';
+    inp.autocomplete = 'off';
+    inp.setAttribute('aria-label', `${rng.labels[0]?.textContent || 'value'}: exact value`);
+    inp.value = entry ? entry() : fixed(get() / unit, digits);
+    inp.style.left = tag.style.left;
+    tag.hidden = true;
+    trk.appendChild(inp);
+    inp.focus();
+    inp.select();
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      const v = parseNum(inp.value);
+      inp.remove();
+      tag.hidden = false;
+      if (commit && v !== null) {
+        if (enter) enter(v); else set(v * unit);
+        after(false);
+      }
+      refresh();
+    };
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+    });
+    inp.addEventListener('blur', () => finish(true));
+  });
+  const button = (glyph, tip, onClick) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'play';
-    b.textContent = '▶';
-    b.title = 'animate';
-    b.addEventListener('click', () => toggleAnim(play, b));
-    row.appendChild(b);
-  }
+    b.className = 'gly';
+    b.innerHTML = GLYPH[glyph];
+    b.title = tip;
+    b.setAttribute('aria-label', tip);
+    b.addEventListener('click', () => onClick(b));
+    acts.appendChild(b);
+    return b;
+  };
+  if (play) button('play', 'animate', (b) => toggleAnim(play, b));
+  if (reset) button('reset', reset.title, reset.onClick);
   parent.appendChild(row);
   refresh();
   return { refresh, row };
@@ -384,7 +520,7 @@ function buildTau() {
   box.innerHTML = '';
   if (anim && anim.key === 'tau') stopAnim();
   tauSliders = state.tau.map((_, i) => slider(box, {
-    label: `τ<sub>${i + 1}</sub>`, min: -2 * PI, max: 2 * PI, step: 0.01,
+    label: `<i>τ</i><sub>${i + 1}</sub>`, min: -2 * PI, max: 2 * PI, step: 0.001,
     get: () => state.tau[i], set: (v) => { state.tau[i] = v; },
     play: { key: 'tau', i },
   }));
@@ -395,20 +531,20 @@ function buildTau() {
 }
 
 const domainSliders = [
-  slider($('domainRows'), { label: 'centre x', min: -20, max: 20, step: 0.01, get: () => state.z0[0], set: (v) => { state.z0[0] = v; } }),
-  slider($('domainRows'), { label: 'centre y', min: -20, max: 20, step: 0.01, get: () => state.z0[1], set: (v) => { state.z0[1] = v; } }),
-  slider($('domainRows'), { label: 'width', min: 0.5, max: 40, step: 0.05, get: () => state.width, set: (v) => { state.width = Math.max(0.05, v); } }),
-  slider($('domainRows'), { label: 'height', min: 0.5, max: 40, step: 0.05, get: () => state.height, set: (v) => { state.height = Math.max(0.05, v); } }),
+  slider($('domainRows'), { label: '<i>x</i><sub>0</sub>', title: 'centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[0], set: (v) => { state.z0[0] = v; } }),
+  slider($('domainRows'), { label: '<i>y</i><sub>0</sub>', title: 'centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[1], set: (v) => { state.z0[1] = v; } }),
+  slider($('domainRows'), { label: 'width', min: 0.5, max: 40, step: 0.001, get: () => state.width, set: (v) => { state.width = Math.max(0.05, v); } }),
+  slider($('domainRows'), { label: 'height', min: 0.5, max: 40, step: 0.001, get: () => state.height, set: (v) => { state.height = Math.max(0.05, v); } }),
 ];
-const phiSlider = slider($('phiRow'), { label: 'grid angle', min: -PI, max: PI, step: 0.01, get: () => state.phi, set: (v) => { state.phi = v; } });
+const phiSlider = slider($('phiRow'), { label: 'angle', title: 'angle of the grid in the z-plane', min: -PI, max: PI, step: 0.001, unit: PI, suffix: 'π', get: () => state.phi, set: (v) => { state.phi = v; } });
 const appearanceSliders = [
   slider($('appearanceRows'), {
-    label: 'line spacing', min: 0.02, max: 2, step: 0.01, get: () => state.gridStep,
+    label: 'line spacing', min: 0.02, max: 2, step: 0.001, get: () => state.gridStep,
     set: (v) => { state.gridStep = Math.max(0.005, v); viewer.setStyle({ gridStep: state.gridStep }); },
     recompute: false,
   }),
   slider($('appearanceRows'), {
-    label: 'line width', min: 0.2, max: 2.5, step: 0.05, get: () => state.lineW,
+    label: 'line width', min: 0.2, max: 2.5, step: 0.01, digits: 2, get: () => state.lineW,
     set: (v) => { state.lineW = v; viewer.setStyle({ lineWidth: v }); },
     recompute: false,
   }),
@@ -430,7 +566,7 @@ function recolour() {
   viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
 }
 const Hslider = slider($('Hrow'), {
-  label: 'H', min: 0.05, max: 3, step: 0.01, get: () => state.H,
+  label: '<i>H</i>', min: 0.05, max: 3, step: 0.01, digits: 2, get: () => state.H,
   set: (v) => {
     state.H = Math.max(0.01, v);
     viewer.setScale(1 / (2 * state.H));
@@ -479,15 +615,21 @@ function whithamNote() {
     $('whithamNote').textContent = 'Moves the branch points keeping the conformal type of the period lattice.';
     return;
   }
-  // W at the current point: on the family, interpolated in s
-  const P = F.points, s = whitham.s;
-  let i = 1;
-  while (i < P.length - 1 && P[i].s < s) i++;
-  const f = P[i].s > P[i - 1].s ? Math.min(1, Math.max(0, (s - P[i - 1].s) / (P[i].s - P[i - 1].s))) : 0;
-  const Ws = P.map((p) => p.W);
-  const lines = [`𝒲 = ${fmt(P[i - 1].W + f * (P[i].W - P[i - 1].W), 4)} (family: ${fmt(Math.min(...Ws), 3)} … ${fmt(Math.max(...Ws), 3)})`];
-  for (const c of F.critical) lines.push(`𝒲 critical: 𝒲 = ${fmt(P[c].W, 4)}`);
-  $('whithamNote').textContent = lines.join('\n');
+  const P = F.points, Ws = P.map((p) => p.W);
+  const lines = F.critical.map((c) => `<span class="tickmark"></span>critical 𝒲 = ${fixed(P[c].W, 4)}`);
+  lines.push(`family: 𝒲 from ${fixed(Math.min(...Ws), 3)} to ${fixed(Math.max(...Ws), 3)}`);
+  $('whithamNote').innerHTML = lines.join('<br>');
+}
+
+// W at the current spectral data, in the frame of the slider's centre (the curve's anchor)
+function currentW() {
+  if (genus() < 2) return null;
+  const key = JSON.stringify([state.alphas, whitham.z]);
+  if (currentW.key !== key) {
+    currentW.key = key;
+    try { currentW.val = willmore(state.alphas, whitham.z)[0]; } catch { currentW.val = null; }
+  }
+  return currentW.val;
 }
 
 // the family (Whitham curve through the current data) for the λ-plane, traced in its own worker so it
@@ -518,6 +660,7 @@ function pumpFamily() {
         family.data = error ? null : result;
         widget.set({ family: family.data });
         whithamNote();
+        whithamSlider.refresh();
       }
       pumpFamily();
     };
@@ -547,7 +690,6 @@ function whithamMove(s) {
       width: state.width * m, height: state.height * m,
     };
   }
-  s = snapToCritical(s);
   const r = whitham.curve.at(s);
   state.alphas = r.alphas;
   whitham.s = r.s;
@@ -590,26 +732,54 @@ function criticalPoints() {
   whitham.critical = { family: F, curve: whitham.curve, s: list };
   return list;
 }
-function snapToCritical(s) {
-  for (const sc of criticalPoints()) if (Math.abs(s - sc) < 0.03) return sc;
-  return s;
+// the critical points for the slider's ticks: refined once there is a curve, else the coarse family's
+function criticalS() {
+  if (whitham.curve) return criticalPoints();
+  const F = family.data;
+  return F ? F.critical.map((c) => F.points[c].s) : [];
 }
+
+// exact entry of W: the nearest point (to the current one) of the curve where W takes that value,
+// located on the family's samples (or the curve's, with the family off) and refined by secant steps
+function whithamEnter(target) {
+  if (genus() < 2) return;
+  if (!whitham.curve) whithamMove(whitham.s);
+  const C = whitham.curve;
+  if (!C) return;
+  const W = (t) => C.willmore(C.at(t))[0];
+  const P = family.data ? family.data.points
+    : Array.from({ length: 61 }, (_, k) => { const t = -1.5 + k * 0.05; return { s: t, W: W(t) }; });
+  let best = null;
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1].W - target, b = P[i].W - target;
+    if (a * b > 0 || a === b) continue;
+    const t = P[i - 1].s + (a / (a - b)) * (P[i].s - P[i - 1].s);
+    if (best === null || Math.abs(t - whitham.s) < Math.abs(best - whitham.s)) best = t;
+  }
+  if (best === null) { // out of the family's range: go to the nearest value it takes
+    best = P.reduce((m, p) => (Math.abs(p.W - target) < Math.abs(m.W - target) ? p : m)).s;
+  } else {
+    let t0 = best, t1 = best + 1e-3, f0 = W(t0) - target, f1 = W(t1) - target;
+    for (let it = 0; it < 8 && Math.abs(f1) > 1e-10 && f1 !== f0; it++) {
+      const t2 = t1 - (f1 * (t1 - t0)) / (f1 - f0);
+      if (!Number.isFinite(t2) || Math.abs(t2 - best) > 0.2) break;
+      [t0, f0, t1, f1] = [t1, f1, t2, W(t2) - target];
+    }
+    if (Math.abs(t1 - best) <= 0.2) best = t1;
+  }
+  whithamMove(Math.max(-1.5, Math.min(1.5, best)));
+}
+
 const whithamSlider = slider($('whithamRow'), {
-  label: '', number: false, min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
+  label: '𝒲', min: -1.5, max: 1.5, step: 0.001, get: () => whitham.s,
   set: (v) => { whithamMove(v); },
+  display: () => { const W = currentW(); return W === null ? '–' : fixed(W, 4); },
+  entry: () => { const W = currentW(); return W === null ? '' : fixed(W, 4); },
+  enter: whithamEnter,
+  snap: criticalS,
   play: { key: 'whitham' },
+  reset: { title: 'recentre: make the current spectral curve the centre of the slider', onClick: () => { whithamRecentre(); requestFamily(); } },
 });
-{
-  // the recentre button sits beside the play button, same size
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'play';
-  b.id = 'whithamReset';
-  b.textContent = '↻';
-  b.title = 'recentre: make the current spectral curve the centre of the slider';
-  b.addEventListener('click', () => { whithamRecentre(); requestFamily(); });
-  whithamSlider.row.appendChild(b);
-}
 $('showFamily').addEventListener('change', () => { family.key = null; requestFamily(); whithamNote(); });
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
 
@@ -680,12 +850,12 @@ function toggleAnim(a, btn) {
   anim = a;
   animBtn = btn;
   btn.classList.add('on');
-  btn.textContent = '■';
+  btn.innerHTML = GLYPH.stop;
   animLast = performance.now();
   requestAnimationFrame(animStep);
 }
 function stopAnim() {
-  if (animBtn) { animBtn.classList.remove('on'); animBtn.textContent = '▶'; }
+  if (animBtn) { animBtn.classList.remove('on'); animBtn.innerHTML = GLYPH.play; }
   anim = null;
   animBtn = null;
   changed(false);

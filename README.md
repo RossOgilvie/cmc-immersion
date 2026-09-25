@@ -44,5 +44,5 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
     src/spectral-widget.js λ-plane editor
     src/app.js             panel, scheduling (coarse preview while dragging, then full), presets, export
     test/                  node tests against cmc_reference.py:  python3 test/fixtures.py && node test/run.mjs
-    vendor/                three.js r186
+    vendor/                three.js r186; fonts/: EB Garamond (SIL OFL), served locally
     old/                   the earlier theta-function attempt

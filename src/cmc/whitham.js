@@ -187,12 +187,7 @@ export class WhithamCurve {
 
   /** The Willmore functional at a point of the curve, in the frame parallel to (1, i) at the anchor. */
   willmore({ alphas, z }) {
-    const P = basicPeriods(alphas, M);
-    const b1 = thetaPoly(alphas, cdiv([1, 0], z), P), b2 = thetaPoly(alphas, cdiv([0, 1], z), P);
-    const a = aPoly(alphas);
-    const d = [cmul(b1[0], b2[1])[0] - cmul(b2[0], b1[1])[0], cmul(b1[0], b2[1])[1] - cmul(b2[0], b1[1])[1]];
-    const W = cmul([0, 8], cdiv(d, [a[0], a[1]]));
-    return W; // [re, im]; im vanishes up to quadrature error
+    return willmore(alphas, z);
   }
 
   /**
@@ -227,4 +222,18 @@ function solve(A, b, n) {
     }
   }
   return Mx.map((r, i) => r[n] / r[i]);
+}
+
+/**
+ * The Willmore functional W = 8i (b0^1 b1^2 - b0^2 b1^1) / a0 of the spectral data, with b^k the
+ * differentials p_{w_k / z}: z = 1 is the frame parallel to (1, i) here, and a point of a Whitham curve
+ * passes its own z to stay in the frame of the curve's anchor. Returns [re, im]; im vanishes up to
+ * quadrature error.
+ */
+export function willmore(alphas, z = [1, 0]) {
+  const P = basicPeriods(alphas, M);
+  const b1 = thetaPoly(alphas, cdiv([1, 0], z), P), b2 = thetaPoly(alphas, cdiv([0, 1], z), P);
+  const a = aPoly(alphas);
+  const d = [cmul(b1[0], b2[1])[0] - cmul(b2[0], b1[1])[0], cmul(b1[0], b2[1])[1] - cmul(b2[0], b1[1])[1]];
+  return cmul([0, 8], cdiv(d, [a[0], a[1]]));
 }

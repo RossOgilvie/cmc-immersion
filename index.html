@@ -5,86 +5,191 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CMC Surfaces from Spectral Data</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/fonts/eb-garamond.css">
 <style>
   :root {
-    --paper: #f5f0e4; --paper2: #ece5d3; --ink: #2b2620; --rule: #cdc2a8; --accent: #a4472a;
-    --divisor: #2f5f9e; --disc: rgba(43, 38, 32, 0.035); --muted: #6d6456;
+    --paper: #F2EEE3; --hover: #E8E2D3; --shade: #EAE4D6; --ink: #27231E; --muted: #6A6257; --rule: #CFC5B0;
+    --accent: #9E3F24; --blue: #3D5A80; --disc: rgba(234, 228, 214, 0.55);
+    --serif: 'EB Garamond', Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
   }
   html, body { margin: 0; height: 100%; }
   body {
     background: var(--paper); color: var(--ink); display: flex; overflow: hidden;
-    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    font-family: var(--serif); font-variant-numeric: lining-nums tabular-nums;
   }
   #stage { flex: 1 1 auto; position: relative; min-width: 0; }
   #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
   #view:active { cursor: grabbing; }
   #status {
-    position: absolute; top: 10px; left: 14px; right: 14px; font-size: 12.5px; font-style: italic;
+    position: absolute; top: 10px; left: 14px; right: 34px; font-size: 15px; font-style: italic;
     color: var(--muted); pointer-events: none; white-space: pre-wrap;
   }
   #status.err { color: #8c2f19; font-style: normal; }
   #busy {
-    position: absolute; top: 12px; right: 14px; width: 10px; height: 10px; border-radius: 50%;
+    position: absolute; top: 14px; right: 14px; width: 9px; height: 9px; border-radius: 50%;
     background: var(--accent); opacity: 0; transition: opacity .2s;
   }
   #busy.on { opacity: 0.8; animation: pulse 0.9s ease-in-out infinite alternate; }
   @keyframes pulse { from { transform: scale(0.6); } to { transform: scale(1); } }
   #keys {
-    position: absolute; left: 14px; bottom: 10px; font-size: 12px; font-style: italic; color: var(--muted);
+    position: absolute; left: 14px; bottom: 10px; font-size: 14.5px; font-style: italic; color: var(--muted);
     pointer-events: none;
   }
+
+  /* ---------------------------------------------------------------- panel */
   #panel {
-    flex: 0 0 340px; height: 100%; overflow-y: auto; box-sizing: border-box; padding: 16px 18px 40px;
-    border-left: 1px solid var(--rule); font-size: 13.5px; line-height: 1.45;
-    background: linear-gradient(90deg, var(--paper2), var(--paper) 14px);
+    flex: 0 0 360px; height: 100%; overflow-y: auto; box-sizing: border-box; padding: 22px 22px 40px;
+    border-left: 1px solid var(--rule); background: var(--paper); font-size: 17px; line-height: 1.35;
   }
-  h1 { font-size: 17px; font-weight: normal; font-variant: small-caps; letter-spacing: 0.1em; margin: 2px 0; }
-  .sub { font-style: italic; font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
-  fieldset { border: none; border-top: 1px solid var(--rule); margin: 12px 0 0; padding: 8px 0 0; min-width: 0; }
-  legend { font-variant: small-caps; letter-spacing: 0.1em; font-size: 12.5px; padding-right: 8px; }
-  #lam { width: 100%; aspect-ratio: 1; display: block; touch-action: none; margin-top: 4px; }
-  .small { font-size: 11.5px; color: var(--muted); font-style: italic; margin: 4px 0; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 5px 0; }
-  .row > label:first-child { flex: 0 0 78px; }
-  .row input[type=range] { flex: 1 1 auto; min-width: 0; }
-  input[type=range] { accent-color: var(--accent); }
-  input[type=number] {
-    width: 62px; background: transparent; border: none; border-bottom: 1px solid var(--rule); color: var(--ink);
-    font-family: 'Courier New', monospace; font-size: 12.5px; padding: 1px 0;
-  }
-  input[type=number]:focus { outline: none; border-bottom-color: var(--accent); }
-  select, button {
-    font-family: inherit; font-size: 13px; background: transparent; color: var(--ink);
-    border: 1px solid var(--rule); border-radius: 2px; padding: 3px 8px; cursor: pointer;
-  }
-  select { flex: 1 1 auto; min-width: 0; }
-  button:hover { border-color: var(--accent); color: var(--accent); }
-  button.play { width: 28px; padding: 2px 0; flex: 0 0 auto; }
-  button.play.on { background: var(--accent); color: var(--paper); border-color: var(--accent); }
-  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
-  .btnrow .grow { flex: 1; }
-  .alpharow { display: flex; gap: 6px; align-items: center; margin: 3px 0; font-size: 13px; }
-  .alpharow .name { flex: 0 0 28px; }
-  .alpharow label { color: var(--muted); font-size: 12px; }
-  .alpharow button { padding: 0 6px; font-size: 12px; margin-left: auto; }
-  .cb { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
-  input[type=color] { width: 34px; height: 22px; border: 1px solid var(--rule); background: none; padding: 0; }
-  details.help { margin: 2px 0 0; border: none; padding: 0; }
-  details.help summary { font-variant: normal; letter-spacing: 0; font-style: italic; font-size: 11.5px; color: var(--muted); }
-  details.help p { margin: 2px 0 4px; }
-  details { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 8px; }
-  summary { cursor: pointer; font-variant: small-caps; letter-spacing: 0.1em; font-size: 12.5px; }
-  details p { font-size: 12.5px; margin: 6px 0; }
+  h1 { font-size: 23px; font-weight: 500; font-variant-caps: all-small-caps; letter-spacing: 0.08em; margin: 0; }
+  .sub { font-style: italic; font-size: 15px; color: var(--muted); margin: 2px 0 0; }
+  .note { font-style: italic; font-size: 15.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.35; }
+  .muted { color: var(--muted); }
   .hide { display: none !important; }
+  [hidden] { display: none !important; }
+
+  /* sections: chevron + small-caps header + hairline rule */
+  .sec { margin-top: 22px; }
+  .sech { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-size: 19px; font-weight: 500; }
+  .sech::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+  .sech .disc { font-variant-caps: all-small-caps; letter-spacing: 0.09em; }
+  .disc {
+    background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; text-align: left;
+  }
+  .disc:hover .chev { color: var(--accent); }
+  .disc:focus-visible { outline: 1px dotted var(--accent); }
+  .chev { display: inline-grid; color: var(--muted); transition: transform 120ms; }
+  .disc[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+  /* glyph and text buttons: borderless */
+  .gly {
+    background: none; border: 0; color: var(--ink); cursor: pointer; width: 34px; height: 34px; padding: 0;
+    display: inline-grid; place-items: center; border-radius: 50%; flex: 0 0 auto;
+  }
+  .gly:hover { color: var(--accent); background: var(--hover); }
+  .gly.on { color: var(--accent); }
+  .gly:focus-visible, .tbtn:focus-visible { outline: 1px dotted var(--accent); }
+  .tbtn {
+    background: none; border: 0; font: inherit; font-size: 16px; color: var(--ink); cursor: pointer;
+    padding: 4px 7px; border-radius: 3px;
+  }
+  .tbtn:hover { color: var(--accent); background: var(--hover); }
+  button:disabled, input:disabled { opacity: 0.4; cursor: default; }
+  button:disabled:hover { color: var(--ink); background: none; }
+  .btnrow { display: flex; gap: 2px 4px; flex-wrap: wrap; align-items: center; margin: 6px 0 0 -7px; }
+
+  /* sliders: label, track with the value floating over the thumb, action buttons */
+  .sl { display: grid; grid-template-columns: var(--labw, 22px) 1fr auto; align-items: end; column-gap: 8px; height: 46px; }
+  .sl > label { padding-bottom: 5px; white-space: nowrap; }
+  .sl .acts { display: flex; margin-bottom: -5px; }
+  .trk { position: relative; padding-top: 18px; min-width: 0; }
+  .rng {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 24px; background: transparent; margin: 0;
+    cursor: pointer; display: block;
+  }
+  .rng::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right, var(--accent) var(--p), var(--rule) var(--p)); }
+  .rng::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--accent); margin-top: -5.5px; box-sizing: border-box;
+  }
+  .rng::-moz-range-track { height: 2px; background: var(--rule); }
+  .rng::-moz-range-progress { height: 2px; background: var(--accent); }
+  .rng::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%; background: var(--accent); border: 2px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--accent); box-sizing: border-box;
+  }
+  .rng:focus-visible { outline: 1px dotted var(--accent); outline-offset: 2px; }
+  .tag {
+    position: absolute; top: 0; transform: translateX(-50%); background: none; border: 0; padding: 0 2px;
+    font: inherit; font-size: 14px; color: var(--muted); cursor: text; line-height: 1; white-space: nowrap;
+  }
+  .tag:hover { color: var(--accent); }
+  .tagin { position: absolute; top: -3px; transform: translateX(-50%); width: 72px; text-align: center; font-size: 14px; }
+  .tick { position: absolute; top: 24px; width: 1px; height: 12px; margin-left: -0.5px; background: var(--ink); pointer-events: none; }
+  .tickmark { display: inline-block; width: 1px; height: 12px; background: var(--ink); margin-right: 8px; vertical-align: -1px; }
+
+  /* number fields: underline only */
+  .num {
+    font: inherit; font-size: 16px; border: 0; border-bottom: 1px solid var(--rule); background: transparent;
+    color: var(--ink); width: 54px; text-align: right; padding: 2px 0; border-radius: 0; min-width: 0;
+  }
+  .num:hover { border-bottom-color: var(--muted); }
+  .num:focus { outline: none; border-bottom-color: var(--accent); }
+
+  /* checkboxes */
+  .cb { display: grid; grid-template-columns: 22px 1fr; align-items: center; column-gap: 8px; min-height: 32px; cursor: pointer; }
+  .chk {
+    -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin: 0; border: 1.25px solid var(--ink);
+    border-radius: 2px; background: transparent; display: grid; place-content: center; cursor: pointer;
+  }
+  .chk:checked { background: var(--accent); border-color: var(--accent); }
+  .chk:checked::after {
+    content: ''; width: 7px; height: 3.5px; border-left: 1.5px solid var(--paper); border-bottom: 1.5px solid var(--paper);
+    transform: translateY(-1px) rotate(-45deg);
+  }
+  .chk:focus-visible { outline: 1px dotted var(--accent); outline-offset: 2px; }
+
+  /* selects: underline only, with a stroke chevron */
+  select {
+    -webkit-appearance: none; appearance: none; font: inherit; font-size: 16px; color: var(--ink); cursor: pointer;
+    border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; padding: 2px 20px 2px 0; min-width: 0;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%236A6257' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 4px center;
+  }
+  select:hover { border-bottom-color: var(--muted); }
+  select:focus { outline: none; border-bottom-color: var(--accent); }
+  option { background: var(--paper); color: var(--ink); }
+  .frow { display: grid; grid-template-columns: 96px 1fr; align-items: center; column-gap: 8px; min-height: 38px; }
+  .frow > select { width: 100%; }
+
+  /* colour swatches */
+  input[type=color] {
+    -webkit-appearance: none; appearance: none; width: 24px; height: 24px; padding: 0; border: 1px solid var(--rule);
+    border-radius: 50%; background: none; cursor: pointer;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type=color]::-webkit-color-swatch { border: none; border-radius: 50%; }
+  input[type=color]::-moz-color-swatch { border: none; border-radius: 50%; }
+  input[type=color]:hover { border-color: var(--accent); }
+  .swatches { display: flex; gap: 10px; align-items: center; }
+
+  /* spectral data */
+  .specbar { display: flex; align-items: center; justify-content: space-between; }
+  .specbar .disc { font-style: italic; color: var(--muted); font-size: 15.5px; }
+  .genus { display: flex; align-items: center; }
+  .genus #genus { min-width: 12px; text-align: center; }
+  #lam { width: 100%; aspect-ratio: 1; display: block; touch-action: none; margin: 4px 0 2px; }
+  .lamrow, .bprow { display: grid; align-items: center; column-gap: 4px; }
+  .lamrow { grid-template-columns: 34px 1fr 60px 18px 34px; height: 40px; border-top: 1px solid var(--rule); padding-top: 4px; }
+  .lamrow .sym { font-size: 19px; color: var(--accent); }
+  .lab { color: var(--muted); font-style: italic; text-align: right; }
+  .bphead { height: 30px; margin-top: 2px; }
+  .bphead i { font-style: italic; }
+  .bprow {
+    grid-template-columns: 34px 14px 56px 30px 56px 16px 1fr; height: 36px; padding-left: 4px; border-radius: 3px;
+  }
+  .bprow:hover { background: var(--shade); }
+  .bprow.sel { background: var(--shade); }
+  .bprow .disc { font-size: 18px; gap: 0; }
+  .bprow.sel .disc { color: var(--accent); }
+  .bprow .gly { justify-self: end; }
+  sub { font-size: 0.68em; line-height: 0; }
+
+  #domainRows { --labw: 50px; }
+  #phiRow { --labw: 50px; }
+  #appearanceRows { --labw: 96px; }
+  #closeInfo { display: block; }
+
+  .help p { margin: 4px 0 6px; font-size: 15.5px; font-style: italic; color: var(--muted); }
+  .about p { font-size: 15.5px; margin: 6px 0; }
+
   @media (max-width: 840px) {
     html, body { height: auto; min-height: 100%; }
     body { flex-direction: column; overflow: auto; }
     #stage { flex: none; height: 62vh; min-height: 320px; }
-    #panel { flex: none; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--rule);
-      padding: 10px 16px 48px; background: var(--paper2); }
+    #panel { flex: none; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--rule); padding: 14px 16px 48px; }
     #lam { max-width: 360px; margin: 4px auto 0; }
     #keys { display: none; }
-    input[type=number], select { font-size: 16px; }
   }
 </style>
 </head>
@@ -100,107 +205,127 @@
   <h1>CMC surfaces</h1>
   <p class="sub">Immersions of the plane with constant mean curvature, built from spectral data by integrating polynomial Killing fields.</p>
 
-  <fieldset>
-    <legend>Mean curvature</legend>
-    <div id="Hrow"></div>
-  </fieldset>
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyH"><span class="chev" data-glyph="chev"></span>Mean curvature</button></h2>
+    <div class="secbody" id="bodyH"><div id="Hrow"></div></div>
+  </section>
 
-  <fieldset>
-    <legend>Spectral data</legend>
-    <details class="help">
-      <summary>how to use</summary>
-      <p class="small">Drag the branch points α (black dots) and the Sym point λ₀ (red dot). A small red diamond on the circle marks a common root of the differentials Θ, where λ₀ closes up translationally in every direction; λ₀ snaps onto it. Shift-drag turns everything together. Double-click to add or remove a branch point. The blue rings mark the eigenline divisor at the centre of the domain.</p>
-    </details>
-    <canvas id="lam"></canvas>
-    <div class="btnrow">
-      <button id="addAlpha" type="button">+ branch point</button>
-      <button id="remAlpha" type="button">− branch point</button>
-      <span class="grow"></span><span id="genus"></span>
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodySpec"><span class="chev" data-glyph="chev"></span>Spectral data</button></h2>
+    <div class="secbody" id="bodySpec">
+      <div class="specbar">
+        <button class="disc" type="button" aria-expanded="false" aria-controls="helpText"><span class="chev" data-glyph="chev"></span>how to use</button>
+        <span class="genus">genus
+          <button class="gly" id="remAlpha" type="button" data-glyph="minus" aria-label="Decrease genus (removes the selected branch point)" title="remove the selected branch point"></button>
+          <span id="genus"></span>
+          <button class="gly" id="addAlpha" type="button" data-glyph="plus" aria-label="Increase genus (adds a branch point)" title="add a branch point"></button>
+        </span>
+      </div>
+      <div class="help" id="helpText" hidden>
+        <p>Drag the branch points α (black dots) and the Sym point λ₀ (rust dot); click a branch point to select it. A small rust diamond on the circle marks a common root of the differentials Θ, where λ₀ closes up translationally in every direction; λ₀ snaps onto it. Shift-drag turns everything together. Double-click to add or remove a branch point. The grey rings mark the eigenline divisor at the centre of the domain.</p>
+      </div>
+      <canvas id="lam"></canvas>
+      <div class="lamrow">
+        <span class="sym">λ<sub>0</sub></span>
+        <label class="lab" for="theta0">arg</label>
+        <input class="num" id="theta0" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of λ0 in units of π">
+        <span class="muted">π</span>
+        <button class="gly" id="playLam" type="button" data-glyph="play" aria-label="Sweep λ0 around the circle" title="sweep λ₀ around the circle (associated family)"></button>
+      </div>
+      <button class="disc bphead" type="button" aria-expanded="true" aria-controls="alphaList"><span class="chev" data-glyph="chev"></span><i>branch points</i> <span class="muted" id="bpCount"></span></button>
+      <div id="alphaList"></div>
     </div>
-    <div id="alphaList"></div>
-    <div class="alpharow">
-      <span class="name">λ₀</span><label>arg</label><input type="number" id="theta0" step="0.01">
-      <span class="grow"></span>
-      <button class="play" id="playLam" type="button" title="sweep λ₀ around the circle (associated family)">▶</button>
+  </section>
+
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="whithamBox"><span class="chev" data-glyph="chev"></span>Whitham deformation</button></h2>
+    <div class="secbody" id="whithamBox">
+      <div id="whithamRow"></div>
+      <label class="cb"><input type="checkbox" class="chk" id="whithamDomain" checked><span>carry the domain along</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="showFamily" checked><span>show the family in the λ-plane</span></label>
+      <p class="note" id="whithamNote"></p>
     </div>
-  </fieldset>
+  </section>
 
-  <fieldset id="whithamBox">
-    <legend>Whitham deformation</legend>
-    <div id="whithamRow"></div>
-    <label class="cb"><input type="checkbox" id="whithamDomain" checked> carry the domain along</label>
-    <label class="cb"><input type="checkbox" id="showFamily" checked> show the family in the λ-plane</label>
-    <p class="small" id="whithamNote" style="white-space: pre-line"></p>
-  </fieldset>
-
-  <fieldset id="tauBox">
-    <legend>Isospectral deformation</legend>
-    <div id="tauList"></div>
-    <p class="small" id="tauNote"></p>
-  </fieldset>
-
-  <fieldset>
-    <legend>Domain in the z-plane</legend>
-    <div id="domainRows"></div>
-    <label class="cb"><input type="checkbox" id="curv" checked> align grid with curvature lines</label>
-    <div id="phiRow"></div>
-    <div class="btnrow">
-      <button id="closeBtn" type="button" title="find the periods along the grid directions and trim the domain to one closed piece">close up</button>
-      <button id="domainReset" type="button" title="back to the domain of the last preset, link or close-up">reset domain</button>
-      <span class="small" id="closeInfo"></span>
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="tauBox"><span class="chev" data-glyph="chev"></span>Isospectral deformation</button></h2>
+    <div class="secbody" id="tauBox">
+      <div id="tauList"></div>
+      <p class="note" id="tauNote"></p>
     </div>
-  </fieldset>
+  </section>
 
-  <fieldset>
-    <legend>Appearance</legend>
-    <div class="row"><label for="colour">colour</label>
-      <select id="colour">
-        <option value="side">two-sided</option>
-        <option value="u">conformal factor u</option>
-        <option value="K">Gauss curvature K</option>
-      </select></div>
-    <label class="cb"><input type="checkbox" id="grid" checked> draw parameter lines</label>
-    <div id="appearanceRows"></div>
-    <div class="row"><label>colours</label>
-      <input type="color" id="front" title="the side N points to (mean-convex side)" value="#6f8fb0">
-      <input type="color" id="back" title="the other side" value="#e8c9a0">
-      <input type="color" id="bg" title="background" value="#f5f0e4">
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyDomain"><span class="chev" data-glyph="chev"></span>Domain in the z-plane</button></h2>
+    <div class="secbody" id="bodyDomain">
+      <div id="domainRows"></div>
+      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>align grid with curvature lines</span></label>
+      <div id="phiRow"></div>
+      <div class="btnrow">
+        <button class="tbtn" id="closeBtn" type="button" title="find the periods along the grid directions and trim the domain to one closed piece">close up</button>
+        <button class="tbtn" id="domainReset" type="button" title="back to the domain of the last preset, link or close-up">reset domain</button>
+      </div>
+      <span class="note" id="closeInfo"></span>
     </div>
-    <div class="row"><label for="res">resolution</label>
-      <select id="res">
-        <option value="96">96</option><option value="160">160</option>
-        <option value="240" selected>240</option><option value="360">360</option><option value="512">512</option>
-      </select></div>
-    <label class="cb"><input type="checkbox" id="adapt" checked> adapt the mesh to the metric</label>
-    <div class="row"><label for="acc">accuracy</label>
-      <select id="acc">
-        <option value="0.1">fast (h ≤ 0.1)</option>
-        <option value="0.05" selected>normal (h ≤ 0.05)</option>
-        <option value="0.02">high (h ≤ 0.02)</option>
-      </select></div>
-  </fieldset>
+  </section>
 
-  <fieldset>
-    <legend>Presets &amp; export</legend>
-    <div class="row"><select id="preset"></select></div>
-    <div class="btnrow">
-      <button id="viewReset" type="button" title="reset the rotation and frame the surface (R)">reset view</button>
-      <button id="frameBtn" type="button">frame</button>
-      <button id="pngBtn" type="button">PNG</button>
-      <button id="objBtn" type="button">OBJ</button>
-      <button id="linkBtn" type="button">copy link</button>
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyLook"><span class="chev" data-glyph="chev"></span>Appearance</button></h2>
+    <div class="secbody" id="bodyLook">
+      <div class="frow"><label for="colour">colour</label>
+        <select id="colour">
+          <option value="side">two-sided</option>
+          <option value="u">conformal factor u</option>
+          <option value="K">Gauss curvature K</option>
+        </select></div>
+      <label class="cb"><input type="checkbox" class="chk" id="grid" checked><span>draw parameter lines</span></label>
+      <div id="appearanceRows"></div>
+      <div class="frow"><span>colours</span>
+        <span class="swatches">
+          <input type="color" id="front" title="the side N points to (mean-convex side)" aria-label="Front colour" value="#6f8fb0">
+          <input type="color" id="back" title="the other side" aria-label="Back colour" value="#e8c9a0">
+          <input type="color" id="bg" title="background" aria-label="Background colour" value="#f2eee3">
+        </span></div>
+      <div class="frow"><label for="res">resolution</label>
+        <select id="res">
+          <option value="96">96</option><option value="160">160</option>
+          <option value="240" selected>240</option><option value="360">360</option><option value="512">512</option>
+        </select></div>
+      <label class="cb"><input type="checkbox" class="chk" id="adapt" checked><span>adapt the mesh to the metric</span></label>
+      <div class="frow"><label for="acc">accuracy</label>
+        <select id="acc">
+          <option value="0.1">fast (h ≤ 0.1)</option>
+          <option value="0.05" selected>normal (h ≤ 0.05)</option>
+          <option value="0.02">high (h ≤ 0.02)</option>
+        </select></div>
     </div>
-  </fieldset>
+  </section>
 
-  <details>
-    <summary>About</summary>
-    <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion with H = ½ and metric 4e²ᵘ|dz|²; the H slider rescales it by 1/(2H).</p>
-    <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
-    <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
-    <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
-    <p>With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (blue low, red high, in the frame fixed at the curve's centre). A tick across the paths marks critical points of 𝒲, which are where the differentials have a common root, as for tori.</p>
-    <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>.</p>
-  </details>
+  <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyPresets"><span class="chev" data-glyph="chev"></span>Presets &amp; export</button></h2>
+    <div class="secbody" id="bodyPresets">
+      <div class="frow"><label for="preset">preset</label><select id="preset"></select></div>
+      <div class="btnrow">
+        <button class="tbtn" id="viewReset" type="button" title="reset the rotation and frame the surface (R)">reset view</button>
+        <button class="tbtn" id="frameBtn" type="button" title="frame the surface (F)">frame</button>
+        <button class="tbtn" id="pngBtn" type="button" title="save a screenshot">PNG</button>
+        <button class="tbtn" id="objBtn" type="button" title="save the mesh">OBJ</button>
+        <button class="tbtn" id="linkBtn" type="button">copy link</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec about">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="bodyAbout"><span class="chev" data-glyph="chev"></span>About</button></h2>
+    <div class="secbody" id="bodyAbout" hidden>
+      <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion with H = ½ and metric 4e²ᵘ|dz|²; the H slider rescales it by 1/(2H). Angles are given in units of π.</p>
+      <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
+      <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
+      <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
+      <p>The slider shows the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (in the frame fixed at the centre of the slider); click the value to enter one. With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by 𝒲 (blue low, rust high). A tick across the paths, and on the slider, marks critical points of 𝒲, which are where the differentials have a common root, as for tori; the slider snaps onto it.</p>
+      <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>. Type: EB Garamond (SIL Open Font License).</p>
+    </div>
+  </section>
 </aside>
 
 <script>
