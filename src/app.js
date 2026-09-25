@@ -12,9 +12,11 @@ const PI = Math.PI;
 
 const VIEW_DEFAULTS = {
   tau: [], z0: [0, 0], width: 12, height: 12, curv: true, phi: 0,
-  gridStep: 0.25, lineW: 0.6,
+  gridStep: 0.25, lineW: 0.6, hmax: 0.05, res: 240,
 };
 // Widths of the rotational examples are exact closing periods of the parallels, pi / sqrt(det X(lam0)).
+// Bubbletons: a double branch point at the k-th resonance point of the cylinder, where its monodromy is ±I.
+const RES = (k) => (k - Math.sqrt(k * k - 1)) ** 2;
 const PRESETS = [
   { name: 'Round cylinder (g = 0)', s: { alphas: [], theta0: 0, width: PI, height: 10, gridStep: PI / 16 } },
   { name: 'Unduloid (g = 1)', s: { alphas: [polar(0.45, 0)], theta0: PI, width: 2.90682, height: 14 } },
@@ -23,6 +25,14 @@ const PRESETS = [
   { name: 'Twizzler (g = 1)', s: { alphas: [polar(0.45, 0)], theta0: PI / 2, width: 8, height: 8 } },
   { name: 'Bent tube (g = 2)', s: { alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: PI / 2, width: 6, height: 6 } },
   { name: 'Nearly a cylinder (g = 2)', s: { alphas: [polar(0.85, 0), polar(0.85, PI / 2)], theta0: 0.7, width: 10, height: 10 } },
+  { name: 'Bubbleton, two lobes', s: { alphas: [polar(RES(2), 0), polar(RES(2), 0)], theta0: 0, width: PI, height: 3.4, gridStep: PI / 48, hmax: 0.02, res: 360 } },
+  { name: 'Bubbleton, three lobes', s: { alphas: [polar(RES(3), 0), polar(RES(3), 0)], theta0: 0, width: PI, height: 1.6, gridStep: PI / 60, hmax: 0.02, res: 512 } },
+  { name: 'Bubbleton, four lobes', s: { alphas: [polar(RES(4), 0), polar(RES(4), 0)], theta0: 0, width: PI, height: 1.2, gridStep: PI / 80, hmax: 0.02, res: 512 } },
+  // Wente torus: McIntosh's spectral data (arXiv math/0407248, Remark 1: a = 0.1413 ± 0.1018i), refined
+  // by Newton on the closing conditions. The period lattice of zeta is rhombic, <w1, w2> with w1 = 2.31698
+  // real and 2 w2 - w1 = 4.47988 i; E(w1) turns by 2/3 about an axis, E(2 w2 - w1) = id, so the torus
+  // lattice is <3 w1, w1 + w2>, whose fundamental domain is the brick 3 w1 x (4.47988 / 2).
+  { name: 'Wente torus (three lobes)', s: { alphas: [[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]], theta0: 0, width: 6.950948617, height: 2.239937825, gridStep: 6.950948617 / 72, res: 360 } },
   { name: 'Threefold (g = 3)', s: { alphas: [polar(0.4, 0), polar(0.4, 2 * PI / 3), polar(0.4, -2 * PI / 3)], theta0: 0.3, tau: [0], width: 6, height: 6 } },
   { name: 'Genus 4', s: { alphas: [polar(0.54, 0.38), polar(0.4, PI / 2), polar(0.58, -2.6), polar(0.63, -1.25)], theta0: 1, tau: [0.8, -0.5], width: 6, height: 6 } },
 ];
@@ -30,7 +40,7 @@ const PRESETS = [
 const state = {
   alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: PI / 2,
   ...VIEW_DEFAULTS, width: 6, height: 6,
-  res: 240, hmax: 0.05, colour: 'side', grid: true,
+  res: 240, hmax: 0.05, colour: 'side', grid: true, H: 0.5, adapt: true,
   front: '#6f8fb0', back: '#e8c9a0', bg: '#f5f0e4',
 };
 
@@ -45,14 +55,17 @@ function syncTau() {
 const fmt = (x, d = 4) => String(+x.toFixed(d));
 function writeHash() {
   const p = new URLSearchParams();
-  p.set('a', state.alphas.map(([re, im]) => `${fmt(re)},${fmt(im)}`).join(';'));
+  p.set('a', state.alphas.map(([re, im]) => `${fmt(re, 10)},${fmt(im, 10)}`).join(';'));
   p.set('l', fmt(state.theta0));
   if (state.tau.length) p.set('t', state.tau.map((x) => fmt(x)).join(','));
   p.set('c', state.z0.map((x) => fmt(x)).join(','));
-  p.set('d', `${fmt(state.width)},${fmt(state.height)}`);
+  p.set('d', `${fmt(state.width, 8)},${fmt(state.height, 8)}`);
   if (!state.curv) p.set('p', fmt(state.phi));
   if (state.colour !== 'side') p.set('m', state.colour);
   p.set('g', fmt(state.gridStep));
+  if (state.H !== 0.5) p.set('H', fmt(state.H));
+  if (state.hmax !== 0.05) p.set('h', fmt(state.hmax));
+  if (state.res !== 240) p.set('r', state.res);
   // commas and semicolons are safe in a fragment; keep the link readable
   history.replaceState(null, '', '#' + p.toString().replace(/%2C/g, ',').replace(/%3B/g, ';'));
 }
@@ -72,6 +85,9 @@ function readHash() {
     if (p.has('p')) state.phi = +p.get('p') || 0;
     if (p.has('m')) state.colour = p.get('m');
     if (p.has('g')) state.gridStep = +p.get('g') || state.gridStep;
+    if (p.has('H')) state.H = Math.max(0.01, +p.get('H') || 0.5);
+    if (p.has('h')) state.hmax = +p.get('h') || 0.05;
+    if (p.has('r')) state.res = Math.min(1024, Math.max(16, +p.get('r') || 240));
   } catch (e) {
     console.warn('bad URL state', e);
   }
@@ -83,6 +99,7 @@ function readHash() {
 const viewer = new Viewer($('view'));
 let worker = null, busy = false, busyFull = false, pending = null, reqId = 0, shownId = 0;
 let fullTimer = null, needFrame = true, last = null;
+const jobInfo = new Map(); // job id -> what the job computed
 
 function makeWorker() {
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
@@ -95,17 +112,60 @@ function gridDims(res) {
   return [Math.max(2, Math.round((res * state.width) / m)), Math.max(2, Math.round((res * state.height) / m))];
 }
 
+// everything that determines the surface (not the mesh or the accuracy)
+const surfaceKey = () => JSON.stringify([state.alphas, state.theta0, state.tau, state.z0,
+  state.curv ? null : state.phi, state.width, state.height]);
+
 function params(full) {
   const [nx, ny] = gridDims(full ? state.res : 72);
-  return {
+  const p = {
     alphas: state.alphas, theta0: state.theta0, tau: state.tau, z0: state.z0,
     phi: state.curv ? null : state.phi, width: state.width, height: state.height,
     nx, ny, hmax: full ? state.hmax : Math.max(state.hmax, 0.1),
   };
+  // full meshes: put the rows and columns where the surface is, using the preview's metric
+  if (full && state.adapt && last && last.key === surfaceKey() && last.preview) {
+    p.sCoords = equidistribute(last, 's', nx);
+    p.tCoords = equidistribute(last, 't', ny);
+  }
+  return p;
+}
+
+/**
+ * Grid coordinates (relative to z0) along one axis of a result, spaced so that each interval carries
+ * about the same length on the surface: density max e^u across the other axis, plus a floor.
+ */
+function equidistribute(res, axis, N) {
+  const { nx, ny, u } = res;
+  const n = axis === 's' ? nx : ny, m = axis === 's' ? ny : nx;
+  const L = axis === 's' ? state.width : state.height;
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    let mx = 0;
+    for (let j = 0; j < m; j++) {
+      const v = axis === 's' ? u[j * nx + i] : u[i * nx + j];
+      if (Number.isFinite(v)) mx = Math.max(mx, Math.exp(v));
+    }
+    w[i] = mx;
+  }
+  const mean = w.reduce((a, b) => a + b, 0) / n || 1;
+  const x = (i) => -L / 2 + (n > 1 ? (i * L) / (n - 1) : 0);
+  const W = new Float64Array(n); // cumulative length (trapezoid)
+  for (let i = 1; i < n; i++) W[i] = W[i - 1] + 0.5 * (w[i - 1] + w[i] + 0.5 * mean) * (x(i) - x(i - 1));
+  const out = new Float64Array(N);
+  let k = 0;
+  for (let q = 0; q < N; q++) {
+    const target = N > 1 ? (q * W[n - 1]) / (N - 1) : 0;
+    while (k < n - 2 && W[k + 1] < target) k++;
+    const f = W[k + 1] > W[k] ? (target - W[k]) / (W[k + 1] - W[k]) : 0;
+    out[q] = x(k) + Math.min(1, Math.max(0, f)) * (x(k + 1) - x(k));
+  }
+  out[0] = -L / 2; out[N - 1] = L / 2;
+  return out;
 }
 
 function request(full) {
-  pending = { id: ++reqId, full, params: params(full) };
+  pending = { id: ++reqId, full };
   if (busy && busyFull && !full) { // a slow job is in the way of interactive feedback: drop it
     worker.terminate();
     makeWorker();
@@ -121,14 +181,17 @@ function pump() {
   busy = true;
   busyFull = job.full;
   $('busy').classList.add('on');
-  worker.postMessage({ id: job.id, params: job.params });
+  const p = params(job.full);
+  jobInfo.set(job.id, { key: surfaceKey(), preview: !job.full });
+  worker.postMessage({ id: job.id, params: p });
 }
 
 function onResult(e) {
   busy = false;
   const { id, result, error } = e.data;
   if (error) showStatus(error, true);
-  else if (id > shownId) { shownId = id; show(result); }
+  else if (id > shownId) { shownId = id; Object.assign(result, jobInfo.get(id)); show(result); }
+  jobInfo.delete(id);
   if (!pending) $('busy').classList.remove('on');
   pump();
 }
@@ -150,13 +213,15 @@ function colourValues(res) {
   const vals = new Float32Array(N);
   for (let v = 0; v < N; v++) {
     const u = res.u[v];
-    vals[v] = state.colour === 'K' ? 0.25 * (1 - Math.exp(-4 * u)) : u;
+    // K = (2H)^2 (1 - e^{-4u}) / 4 after the homothety by 1/(2H)
+    vals[v] = state.colour === 'K' ? state.H * state.H * (1 - Math.exp(-4 * u)) : u;
   }
   // robust range: K has a long negative tail where u is small
   const sorted = vals.filter(Number.isFinite).sort();
   const q = (f) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
   if (!sorted.length) return { vals, range: [0, 1] };
-  return { vals, range: state.colour === 'K' ? [Math.min(q(0.1), -1e-3), 0.25] : [q(0.02), q(0.98)] };
+  const H2 = state.H * state.H; // K < H^2, with equality only at umbilics
+  return { vals, range: state.colour === 'K' ? [Math.min(q(0.1), -1e-3 * H2), H2] : [q(0.02), q(0.98)] };
 }
 
 function show(res) {
@@ -168,9 +233,9 @@ function show(res) {
   widget.set({ divisor: res.divisor });
   const g = genus();
   const argQ = hopfArg(state.alphas, state.theta0);
-  const size = Math.max(res.bbox[3] - res.bbox[0], res.bbox[4] - res.bbox[1], res.bbox[5] - res.bbox[2]);
+  const size = Math.max(res.bbox[3] - res.bbox[0], res.bbox[4] - res.bbox[1], res.bbox[5] - res.bbox[2]) / (2 * state.H);
   showStatus(
-    `genus ${g} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fmt(wrapPi(argQ), 3)}` +
+    `genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fmt(wrapPi(argQ), 3)}` +
     ` · ${res.nx}×${res.ny} in ${res.stats.ms.toFixed(0)} ms · extent ${size.toPrecision(3)}` +
     (res.stats.detDefect > 1e-6 ? ` · det drift ${res.stats.detDefect.toExponential(1)}` : ''),
     false,
@@ -349,15 +414,66 @@ $('curv').addEventListener('change', () => {
   changed(false);
 });
 
+// ------------------------------------------------------------------ mean curvature (a homothety in R^3)
+
+function recolour() {
+  if (!last) return;
+  const { vals, range } = colourValues(last);
+  if (vals) viewer.setColourValues(vals);
+  viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
+}
+const Hslider = slider($('Hrow'), {
+  label: 'mean curv. H', min: 0.05, max: 3, step: 0.01, get: () => state.H,
+  set: (v) => {
+    state.H = Math.max(0.01, v);
+    viewer.setScale(1 / (2 * state.H));
+    recolour();
+    if (last) show(last);
+  },
+  recompute: false,
+});
+
+// ------------------------------------------------------------------ closing up
+
+$('closeBtn').addEventListener('click', () => {
+  const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  const info = $('closeInfo');
+  info.textContent = 'searching for periods…';
+  $('closeBtn').disabled = true;
+  const done = () => { w.terminate(); $('closeBtn').disabled = false; };
+  w.onerror = (e) => { info.textContent = `error: ${e.message}`; done(); };
+  w.onmessage = (e) => {
+    done();
+    if (e.data.error) { info.textContent = e.data.error; return; }
+    const parts = [];
+    let changedAny = false;
+    for (const d of ['s', 't']) {
+      const r = e.data.result[d];
+      const name = d === 's' ? 'width' : 'height';
+      if (!r) { parts.push(`${d}: no period`); continue; }
+      if (r.q) {
+        state[name] = r.q * r.T;
+        changedAny = true;
+        parts.push(`${d}: closes after ${r.q === 1 ? 'one period' : `${r.q} periods`} (${fmt(r.q * r.T, 5)})`);
+      } else {
+        parts.push(`${d}: period ${fmt(r.T, 4)}, turns ${fmt(r.angle, 4)}, pitch ${fmt(r.pitch, 3)}`);
+      }
+    }
+    info.textContent = parts.join(' · ');
+    if (changedAny) {
+      for (const s of domainSliders) s.refresh();
+      needFrame = true;
+      changed(false);
+    }
+  };
+  w.postMessage({ id: 0, kind: 'close', params: { ...params(true), hmax: Math.min(state.hmax, 0.01) } });
+});
+
 // ------------------------------------------------------------------ appearance
 
 $('colour').addEventListener('change', () => {
   state.colour = $('colour').value;
-  if (last) {
-    const { vals, range } = colourValues(last);
-    if (vals) viewer.setColourValues(vals);
-    viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
-  }
+  recolour();
   writeHashSoon();
 });
 $('grid').addEventListener('change', () => { state.grid = $('grid').checked; viewer.setStyle({ grid: state.grid }); });
@@ -369,6 +485,7 @@ function setBackground(c) {
   $('stage').style.background = c;
   viewer.setBackground(c);
 }
+$('adapt').addEventListener('change', () => { state.adapt = $('adapt').checked; changed(false); });
 $('res').addEventListener('change', () => { state.res = +$('res').value; changed(false); });
 $('acc').addEventListener('change', () => { state.hmax = +$('acc').value; changed(false); });
 
@@ -460,7 +577,13 @@ function refreshAll() {
   buildAlphaList();
   buildTau();
   widget.set({ alphas: state.alphas, theta0: state.theta0, divisor: [] });
-  for (const s of [...domainSliders, phiSlider, ...appearanceSliders]) s.refresh();
+  for (const s of [...domainSliders, phiSlider, ...appearanceSliders, Hslider]) s.refresh();
+  $('res').value = String(state.res);
+  if (!$('res').value) { $('res').add(new Option(String(state.res), String(state.res))); $('res').value = String(state.res); }
+  $('acc').value = String(state.hmax);
+  if (!$('acc').value) { $('acc').add(new Option(`h ≤ ${state.hmax}`, String(state.hmax))); $('acc').value = String(state.hmax); }
+  viewer.setScale(1 / (2 * state.H));
+  $('closeInfo').textContent = '';
   $('curv').checked = state.curv;
   $('phiRow').classList.toggle('hide', state.curv);
   $('colour').value = state.colour;

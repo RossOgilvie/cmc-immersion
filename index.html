@@ -95,7 +95,7 @@
 
 <aside id="panel">
   <h1>CMC surfaces</h1>
-  <p class="sub">Immersions of the plane with constant mean curvature H = ½, built from spectral data by integrating polynomial Killing fields.</p>
+  <p class="sub">Immersions of the plane with constant mean curvature, built from spectral data by integrating polynomial Killing fields.</p>
 
   <fieldset>
     <legend>Spectral data</legend>
@@ -112,6 +112,7 @@
       <span class="grow"></span>
       <button class="play" id="playLam" type="button" title="sweep λ₀ around the circle (associated family)">▶</button>
     </div>
+    <div id="Hrow"></div>
   </fieldset>
 
   <fieldset id="tauBox">
@@ -125,6 +126,10 @@
     <div id="domainRows"></div>
     <label class="cb"><input type="checkbox" id="curv" checked> align grid with curvature lines</label>
     <div id="phiRow"></div>
+    <div class="btnrow">
+      <button id="closeBtn" type="button" title="find the periods along the grid directions and trim the domain to one closed piece">close up</button>
+      <span class="small" id="closeInfo"></span>
+    </div>
   </fieldset>
 
   <fieldset>
@@ -147,6 +152,7 @@
         <option value="96">96</option><option value="160">160</option>
         <option value="240" selected>240</option><option value="360">360</option><option value="512">512</option>
       </select></div>
+    <label class="cb"><input type="checkbox" id="adapt" checked> adapt the mesh to the metric</label>
     <div class="row"><label for="acc">accuracy</label>
       <select id="acc">
         <option value="0.1">fast (h ≤ 0.1)</option>
@@ -168,7 +174,8 @@
 
   <details>
     <summary>About</summary>
-    <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion, with metric 4e²ᵘ|dz|².</p>
+    <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion with H = ½ and metric 4e²ᵘ|dz|²; the H slider rescales it by 1/(2H).</p>
+    <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
     <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
     <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>.</p>
   </details>

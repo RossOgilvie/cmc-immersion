@@ -4,8 +4,9 @@
 import { readFileSync } from 'node:fs';
 import {
   aPoly, kappa0, killingField, flowKilling, isospectralBasis, divisor, FrameIntegrator,
-  computeSurface, hopfArg,
+  computeSurface, hopfArg, closingInfo,
 } from '../src/cmc/cmc.js';
+import { periodVector, periodLattice } from '../src/cmc/periods.js';
 
 let failures = 0;
 function check(name, value, tol) {
@@ -145,6 +146,45 @@ console.log('commutativity around a closed rectangle, and base-point divisor:');
   check('g=3 rectangle holonomy of (zeta, F, G)', maxDiff(Array.from(y), Array.from(y0)), 1e-9);
   const alphas2 = [[0.3, 0], [0, 0.5], [-0.2, -0.6]];
   check('base-point divisor = branch points', setDist(divisor(killingField(alphas2)).map((d) => d.mu), alphas2), 1e-12);
+}
+
+// ------------------------------------------------------------------ periods and closing (§9)
+console.log('periods of Theta_w and closing conditions:');
+{
+  // g = 1: the y-period of the unduloid, against shooting (closingInfo)
+  const T = Math.abs(1 / periodVector([[0.45, 0]], [0, 1])[0]);
+  check('g=1 y-period from Theta_w vs shooting', Math.abs(T - closingInfo({ alphas: [[0.45, 0]], theta0: Math.PI }, 't').T), 1e-6);
+  // g = 2: every lattice generator is a period of zeta (§9.4)
+  const al = [[0.3, 0.4], [0.3, -0.4]];
+  const { generators } = periodLattice(al);
+  let worst = 0;
+  for (const w of generators) {
+    const I = new FrameIntegrator(al, 0), Z = killingField(al), y = I.initialState(Z);
+    const L = Math.hypot(...w);
+    I.march(y, w[0] / L, w[1] / L, L, 0.002);
+    for (let e = 0; e < 32; e++) worst = Math.max(worst, Math.abs(y[e] - Z[e]));
+  }
+  check(`g=2 lattice generators (${generators.length}) are periods of zeta`, generators.length === 2 ? worst : Infinity, 1e-9);
+  // Wente torus: closes around 3 w1 and 2 w2 - w1
+  const W = [[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]];
+  // (generator signs are arbitrary: use T1 = |w1| on the real axis and T2/2 = |Im w2|)
+  const [w1, w2] = periodLattice(W).generators;
+  const T1 = Math.abs(w1[0]), T2h = Math.abs(w2[1]);
+  let err = 0;
+  for (const w of [[3 * T1, 0], [1.5 * T1, T2h], [0, 2 * T2h]]) {
+    const I = new FrameIntegrator(W, 0), Z = killingField(W), y = I.initialState(Z);
+    const L = Math.hypot(...w);
+    I.march(y, w[0] / L, w[1] / L, L, 0.002);
+    const P = new Float64Array(3), N = new Float64Array(3);
+    I.evaluate(y, P, 0, N, 0);
+    for (let e = 0; e < 32; e++) err = Math.max(err, Math.abs(y[e] - Z[e]));
+    err = Math.max(err, Math.hypot(...P), Math.abs(Math.abs(y[32]) - 1));
+  }
+  check('Wente torus closes on the brick lattice <3 T1, 3 T1/2 + i T2/2>', err, 1e-7);
+  // bubbleton: closes around the cylinder at the resonance point
+  const r2 = (2 - Math.sqrt(3)) ** 2;
+  const c = closingInfo({ alphas: [[r2, 0], [r2, 0]], theta0: 0, hmax: 0.002 }, 's');
+  check('two-lobed bubbleton closes after one period pi', c && c.q === 1 ? Math.abs(c.T - Math.PI) : Infinity, 1e-5);
 }
 
 // ------------------------------------------------------------------ timing

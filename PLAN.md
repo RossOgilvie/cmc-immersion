@@ -104,8 +104,17 @@ test/
 4. Colour modes, curvature lines, presets, URL state, export, animation.
 5. Polish pass: screenshots, performance tuning, mobile/narrow layout, README.
 
-## 8. Out of scope for now (noted for later)
+## 8. Status of later additions
 
-- Closing conditions (§9): cylinders and tori. The old quadrature code (`src/integration_cc.js`) would be a natural fit for those period integrals.
+- Done: H slider (a homothety in R³); genus-1 Delaunay locus in the λ-plane; bubbletons (double branch
+  point at a resonance point of the cylinder); the three-lobed Wente torus (McIntosh's data, refined by
+  Newton); `src/cmc/periods.js` computes the periods of Θ_w and the lattice Γ (§9.1–9.3); `closingInfo`
+  does the §9.4 shooting check; metric-adapted meshes; per-step adaptive RK4 step.
+
+## 9. Out of scope for now (noted for later)
+
+- General torus search (closing conditions in the UI), and a "close up" that uses the lattice Γ rather
+  than the grid axes (so non-rectangular fundamental domains work).
+- Whitham deformations preserving the period plane and its conformal type.
 - The $S^3$ version (two Sym points), and a pen-and-ink hatching style like the example page.
 - Direct dragging of divisor points (this needs an inverse map from divisor to $\tau$).

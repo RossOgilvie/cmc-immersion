@@ -126,6 +126,8 @@ export class Viewer {
     this.dist = 10;           // camera distance
     this.radius = 3;          // model radius from the last framing
     this.pan = new THREE.Vector3();
+    this.centre = new THREE.Vector3(); // model-space point at the pivot (set by frame)
+    this.scale = 1;                    // homothety applied to the model (mean curvature H = 1/(2 scale))
     this.keys = new Set();
     this.dirty = true;
     this.gridDims = null;
@@ -215,13 +217,21 @@ export class Viewer {
   frame() {
     const b = this.bbox;
     if (!b || !Number.isFinite(b[0])) return;
-    const c = new THREE.Vector3((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2);
-    this.radius = Math.max(1e-3, 0.5 * Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]));
-    this.holder.position.copy(c).negate();
+    this.centre.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2);
+    this.radius = Math.max(1e-3, 0.5 * this.scale * Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]));
+    this.holder.position.copy(this.centre).multiplyScalar(-this.scale);
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
     const aspect = Math.min(1, this.camera.aspect);
     this.dist = (1.05 * this.radius) / Math.sin(fov / 2) / Math.sqrt(aspect);
     this.pan.set(0, 0, 0);
+    this.dirty = true;
+  }
+
+  /** Scale the model about the pivot, keeping the camera where it is. */
+  setScale(s) {
+    this.scale = s;
+    this.holder.scale.setScalar(s);
+    this.holder.position.copy(this.centre).multiplyScalar(-s);
     this.dirty = true;
   }
 
@@ -245,11 +255,11 @@ export class Viewer {
     cam.position.set(0, 0, this.dist);
     // bounding sphere of the current model about the pivot (the surface may have grown since framing)
     let r = this.radius;
-    const b = this.bbox, o = this.holder.position;
+    const b = this.bbox, o = this.holder.position, k = this.scale;
     if (b && Number.isFinite(b[0])) {
-      const ex = Math.max(Math.abs(b[0] + o.x), Math.abs(b[3] + o.x));
-      const ey = Math.max(Math.abs(b[1] + o.y), Math.abs(b[4] + o.y));
-      const ez = Math.max(Math.abs(b[2] + o.z), Math.abs(b[5] + o.z));
+      const ex = Math.max(Math.abs(k * b[0] + o.x), Math.abs(k * b[3] + o.x));
+      const ey = Math.max(Math.abs(k * b[1] + o.y), Math.abs(k * b[4] + o.y));
+      const ez = Math.max(Math.abs(k * b[2] + o.z), Math.abs(k * b[5] + o.z));
       r = Math.hypot(ex, ey, ez);
     }
     const d = Math.hypot(this.pan.x, this.pan.y, this.dist - this.pan.z);
@@ -275,7 +285,8 @@ export class Viewer {
     if (!P || !I) return '';
     const out = ['# CMC immersion, exported from the spectral-data viewer'];
     const f = (x) => (Math.abs(x) < 1e-12 ? '0' : x.toPrecision(7));
-    for (let v = 0; v < P.count; v++) out.push(`v ${f(P.getX(v))} ${f(P.getY(v))} ${f(P.getZ(v))}`);
+    const k = this.scale;
+    for (let v = 0; v < P.count; v++) out.push(`v ${f(k * P.getX(v))} ${f(k * P.getY(v))} ${f(k * P.getZ(v))}`);
     for (let v = 0; v < N.count; v++) out.push(`vn ${f(N.getX(v))} ${f(N.getY(v))} ${f(N.getZ(v))}`);
     for (let v = 0; v < T.count; v++) out.push(`vt ${f(T.getX(v))} ${f(T.getY(v))}`);
     for (let k = 0; k < I.count; k += 3) {

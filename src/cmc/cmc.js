@@ -307,14 +307,23 @@ export class FrameIntegrator {
     mulAcc(y, f, Xd, 0, dy, gg, 1);
   }
 
-  /** Advance y in place by distance t along direction c = (cr, ci), |c| = 1, with RK4 steps <= hmax. */
+  /**
+   * Advance y in place by distance t along direction c = (cr, ci), |c| = 1, with RK4 steps
+   * h <= hmax / max(1, |G|): the generator ~ zeta/kappa0 is fast where kappa0 is small or u large.
+   */
   march(y, cr, ci, t, hmax) {
-    if (t === 0) return;
-    const N = Math.max(1, Math.ceil(Math.abs(t) / hmax));
-    const h = t / N, len = this.len;
+    const len = this.len, Gen = this.Gen;
     const { k1, k2, k3, k4, tmp } = this;
-    for (let s = 0; s < N; s++) {
-      this.rhs(y, k1, cr, ci);
+    let left = Math.abs(t);
+    const sgn = Math.sign(t);
+    while (left > 1e-14) {
+      this.rhs(y, k1, cr, ci); // also leaves the generator at y in Gen
+      let gmax = 0;
+      for (let e = 0; e < 24; e++) gmax = Math.max(gmax, Math.abs(Gen[e]));
+      const hb = hmax / Math.max(1, gmax);
+      // equal steps over what is left, so the last one isn't a sliver
+      const h = sgn * (left / Math.ceil(left / hb - 1e-9));
+      left -= Math.abs(h);
       for (let e = 0; e < len; e++) tmp[e] = y[e] + 0.5 * h * k1[e];
       this.rhs(tmp, k2, cr, ci);
       for (let e = 0; e < len; e++) tmp[e] = y[e] + 0.5 * h * k2[e];
@@ -393,7 +402,8 @@ export function hopfArg(alphas, theta0) {
  *            window over a fixed surface)
  *   phi      grid rotation: z = z0 + e^{i phi} (s + i t); null means curvature-line aligned
  *   width, height   extent in s and t
- *   nx, ny   grid resolution
+ *   nx, ny   grid resolution (uniform grid), or
+ *   sCoords, tCoords   increasing grid coordinates relative to z0 (e.g. adapted to the metric)
  *   hmax     RK4 step bound
  *
  * Returns { nx, ny, pos, nrm (Float32Array 3N), u (N), st (2N), bbox, phi, divisor, stats }, where
@@ -402,7 +412,9 @@ export function hopfArg(alphas, theta0) {
  */
 export function computeSurface(params) {
   const t0 = (typeof performance !== 'undefined' ? performance : Date).now();
-  const { alphas, theta0, tau = [], z0 = [0, 0], width, height, nx, ny, hmax = 0.02 } = params;
+  const { alphas, theta0, tau = [], z0 = [0, 0], width, height, hmax = 0.02 } = params;
+  const nx = params.sCoords ? params.sCoords.length : params.nx;
+  const ny = params.tCoords ? params.tCoords.length : params.ny;
   const g = alphas.length;
   const kap = kappa0(alphas);
   const phi = params.phi ?? -0.5 * hopfArg(alphas, theta0);
@@ -422,8 +434,10 @@ export function computeSurface(params) {
   const N = nx * ny;
   const pos = new Float32Array(3 * N), nrm = new Float32Array(3 * N);
   const u = new Float32Array(N), st = new Float32Array(2 * N);
-  const s = Array.from({ length: nx }, (_, i) => -width / 2 + (nx > 1 ? (i * width) / (nx - 1) : 0));
-  const t = Array.from({ length: ny }, (_, j) => -height / 2 + (ny > 1 ? (j * height) / (ny - 1) : 0));
+  const s = params.sCoords ? Array.from(params.sCoords)
+    : Array.from({ length: nx }, (_, i) => -width / 2 + (nx > 1 ? (i * width) / (nx - 1) : 0));
+  const t = params.tCoords ? Array.from(params.tCoords)
+    : Array.from({ length: ny }, (_, j) => -height / 2 + (ny > 1 ? (j * height) / (ny - 1) : 0));
   const csr = Math.cos(phi), csi = Math.sin(phi); // s-direction
   const ctr = -csi, cti = csr;                   // t-direction = i e^{i phi}
   // grid coordinates w = e^{-i phi} z are absolute, so parameter lines stay put when z0 moves
@@ -474,4 +488,97 @@ export function computeSurface(params) {
     divisor: divisor(y0.subarray(0, 8 * (g + 2))),
     stats: { ms: t1 - t0, detDefect: maxDet },
   };
+}
+
+// ---------------------------------------------------------------- closing along a direction (§9.4)
+
+/**
+ * Periods and closing in the grid direction dir ('s' or 't') from the domain centre z0 (§9.4).
+ *
+ * Finds the first period T of zeta along the direction (if zeta is constant along it, T is the
+ * first time the frame returns to ±I), then the Euclidean motion f -> Ad(M) f + f(T) with M = F(T).
+ * The surface closes after q periods iff the rotation angle is 2π p/q and the pitch vanishes
+ * (for q = 1: the translation vanishes).
+ *
+ * Returns { T, angle (in turns), pitch, trans, translation f(T), q } with q = 0 if it does not close (q <= qmax),
+ * or null if no period was found within Lmax.
+ */
+export function closingInfo(params, dir, { Lmax = 40, qmax = 24, tol = 1e-5 } = {}) {
+  const { alphas, theta0, tau = [], z0 = [0, 0], hmax = 0.01 } = params;
+  const g = alphas.length, n = g + 2, nz = 8 * n;
+  const kap = kappa0(alphas);
+  const phi = params.phi ?? -0.5 * hopfArg(alphas, theta0);
+  const [cr, ci] = dir === 's' ? [Math.cos(phi), Math.sin(phi)] : [-Math.sin(phi), Math.cos(phi)];
+
+  const Z = killingField(alphas);
+  shapeFlows(g).forEach(([k, c], i) => { if (tau[i]) flowKilling(Z, kap, k, c, tau[i], 0.002); });
+  const I = new FrameIntegrator(alphas, theta0);
+  const y0 = I.initialState(Z);
+  const r0 = Math.hypot(z0[0], z0[1]);
+  if (r0 > 0) I.march(y0, z0[0] / r0, z0[1] / r0, r0, hmax);
+  y0.fill(0, nz);
+  y0[nz] = 1; y0[nz + 6] = 1; // restart the frame at z0
+
+  const zdist = (y) => { let m = 0; for (let e = 0; e < nz; e++) m += (y[e] - y0[e]) ** 2; return Math.sqrt(m); };
+  let zscale = 0;
+  for (let e = 0; e < nz; e++) zscale = Math.max(zscale, Math.abs(y0[e]));
+
+  // is zeta constant along the direction?
+  const dz = new Float64Array(I.len);
+  I.rhs(y0, dz, cr, ci);
+  let rate = 0;
+  for (let e = 0; e < nz; e++) rate = Math.max(rate, Math.abs(dz[e]));
+  let T = null;
+  if (rate < 1e-12 * Math.max(1, zscale)) {
+    // X(lam0) is constant: F = exp(sX) returns to ±I at s = π / sqrt(det X)
+    const X = I.X;
+    const det = X[0] * X[6] - X[1] * X[7] - (X[2] * X[4] - X[3] * X[5]);
+    if (det > 1e-14) T = Math.PI / Math.sqrt(det);
+  } else {
+    const ds = 0.02;
+    const y = y0.slice();
+    let p2 = Infinity, p1 = Infinity;
+    for (let k = 1; k * ds <= Lmax && T === null; k++) {
+      I.march(y, cr, ci, ds, hmax);
+      const v = zdist(y);
+      if (k > 2 && p1 < p2 && p1 <= v && p1 < 0.05 * zscale) {
+        // refine the local minimum by golden section
+        const dist = (s) => { const w = y0.slice(); I.march(w, cr, ci, s, hmax); return zdist(w); };
+        let a = (k - 2) * ds, b = k * ds;
+        const gr = (Math.sqrt(5) - 1) / 2;
+        let x1 = b - gr * (b - a), x2 = a + gr * (b - a), f1 = dist(x1), f2 = dist(x2);
+        for (let it = 0; it < 50; it++) {
+          if (f1 < f2) { b = x2; x2 = x1; f2 = f1; x1 = b - gr * (b - a); f1 = dist(x1); }
+          else { a = x1; x1 = x2; f1 = f2; x2 = a + gr * (b - a); f2 = dist(x2); }
+        }
+        if (Math.min(f1, f2) < 1e-5 * Math.max(1, zscale)) T = (a + b) / 2;
+      }
+      p2 = p1; p1 = v;
+    }
+  }
+  if (T === null) return null;
+
+  const y = y0.slice();
+  I.march(y, cr, ci, T, hmax);
+  const P = new Float64Array(3), N = new Float64Array(3);
+  I.evaluate(y, P, 0, N, 0);
+  const f = nz; // F = [[p, q], [-conj q, conj p]] up to integration error
+  const pr = y[f], pi = y[f + 1], qr = y[f + 2], qi = y[f + 3];
+  const angle = (2 * Math.acos(Math.max(-1, Math.min(1, pr)))) / (2 * Math.PI); // turns, in [0, 1]
+  const ax = [qi, qr, pi]; // rotation axis in the coordinates of §1
+  const an = Math.hypot(...ax);
+  const trans = Math.hypot(P[0], P[1], P[2]);
+  const pitch = an > 1e-9 ? (P[0] * ax[0] + P[1] * ax[1] + P[2] * ax[2]) / an : trans;
+  const scale = Math.max(1, T);
+  let q = 0;
+  for (let k = 1; k <= qmax && !q; k++) {
+    const x = k * angle;
+    if (Math.abs(x - Math.round(x)) < tol * k * 10) q = k;
+  }
+  if (q === 1 && Math.abs(angle - Math.round(angle)) < tol * 10) {
+    if (trans > tol * 100 * scale) q = 0; // pure translation
+  } else if (q && Math.abs(pitch) > tol * 100 * scale) {
+    q = 0;
+  }
+  return { T, angle, pitch, trans, q, translation: [P[0], P[1], P[2]] };
 }

@@ -6,6 +6,8 @@
 //  - divisor points mu_j: hollow blue rings (read-only), clamped to the edge with an arrow if far out
 //
 // Shift+drag rotates all alpha_i and lam0 together (a rotation of the z-plane: same surface, turned).
+// In genus 1 the diameter through lam0 is drawn: there the surface closes into a Delaunay cylinder
+// (unduloid for alpha on the far side, nodoid on the near side), and alpha snaps onto it.
 // Double-click on empty space adds a branch point; double-click on a branch point removes it.
 
 const R_VIEW = 1.55;       // half-width of the view in lambda units
@@ -78,6 +80,7 @@ export class SpectralWidget {
   _bind() {
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
+      this.noSnap = e.altKey;
       const [x, y] = this._eventPos(e);
       const hit = this._pick(x, y);
       if (e.shiftKey) {
@@ -106,7 +109,7 @@ export class SpectralWidget {
         let r = Math.hypot(z[0], z[1]);
         const t = Math.atan2(z[1], z[0]);
         r = Math.min(R_MAX, Math.max(R_MIN, r));
-        this.alphas[d.i] = [r * Math.cos(t), r * Math.sin(t)];
+        this.alphas[d.i] = this._snap([r * Math.cos(t), r * Math.sin(t)]);
       } else if (d.kind === 'lam') {
         this.theta0 = Math.atan2(z[1], z[0]);
       } else if (d.kind === 'rotate') {
@@ -149,6 +152,17 @@ export class SpectralWidget {
     });
   }
 
+  /** Genus 1: snap alpha onto the Delaunay diameter when within a few pixels (hold alt to avoid). */
+  _snap(z) {
+    if (this.alphas.length !== 1 || this.noSnap) return z;
+    const ur = Math.cos(this.theta0), ui = Math.sin(this.theta0);
+    const along = z[0] * ur + z[1] * ui;
+    const off = -z[0] * ui + z[1] * ur;
+    if (Math.abs(off) * this._geom().s > 7) return z;
+    const r = Math.sign(along || 1) * Math.min(R_MAX, Math.max(R_MIN, Math.abs(along)));
+    return [r * ur, r * ui];
+  }
+
   // ---------------------------------------------------------------- drawing
 
   draw() {
@@ -179,6 +193,35 @@ export class SpectralWidget {
     ctx.strokeStyle = ink;
     ctx.lineWidth = 1.3;
     ctx.beginPath(); ctx.arc(cx, cy, s, 0, 2 * Math.PI); ctx.stroke();
+
+    // genus 1: the Delaunay diameter
+    if (this.alphas.length === 1) {
+      const ur = Math.cos(this.theta0), ui = Math.sin(this.theta0);
+      ctx.save();
+      ctx.strokeStyle = accent;
+      ctx.globalAlpha = 0.55;
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(cx - ur * s, cy + ui * s); ctx.lineTo(cx + ur * s, cy - ui * s);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = accent;
+      ctx.font = 'italic 10.5px Georgia, serif';
+      ctx.textAlign = 'center';
+      const lab = (t, txt) => {
+        ctx.save();
+        ctx.translate(cx + t * ur * s, cy - t * ui * s);
+        let a = -this.theta0;
+        if (Math.cos(a) < 0) a += Math.PI;
+        ctx.rotate(a);
+        ctx.fillText(txt, 0, -5);
+        ctx.restore();
+      };
+      lab(0.62, 'nodoids');
+      lab(-0.62, 'unduloids');
+      ctx.restore();
+    }
 
     // branch point at 0
     ctx.lineWidth = 1.5;
