@@ -203,6 +203,18 @@
   </details>
 </aside>
 
-<script type="module" src="src/app.js"></script>
+<script>
+  // If the app fails to start (for instance a stale cached module mixed with updated ones after an
+  // edit or deploy), say so instead of leaving a half-empty page. app.js sets cmcStarted when done.
+  function cmcFailed(msg) {
+    if (window.cmcStarted) return;
+    const s = document.getElementById('status');
+    s.classList.add('err');
+    s.textContent = 'The page failed to start' + (msg ? ': ' + msg : '') + '. If the files were just updated, '
+      + 'the browser may be mixing in stale cached copies: reload with Ctrl+Shift+R (Cmd+Shift+R on a Mac).';
+  }
+  window.addEventListener('error', (e) => cmcFailed(e.message));
+</script>
+<script type="module" src="src/app.js" onerror="cmcFailed('could not load src/app.js')"></script>
 </body>
 </html>

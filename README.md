@@ -8,7 +8,11 @@ polynomial Killing fields. The mathematics is in `cmc_spectral_to_immersion.md`;
 
 No build step. Serve the folder statically and open `index.html`:
 
-    python3 -m http.server 8000      # then visit http://localhost:8000
+    python3 serve.py                 # then visit http://localhost:8000
+
+`serve.py` is `python3 -m http.server` plus `Cache-Control: no-cache`, so the browser never mixes an
+edited module with a stale cached one (which otherwise shows up as a page with no λ-plane and no
+presets; a hard reload, Ctrl+Shift+R, fixes that too).
 
 (Opening the file directly doesn't work: browsers block module workers on `file://`.)
 

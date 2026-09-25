@@ -813,3 +813,4 @@ refreshAll();
 saveHomeDomain();
 setBackground(state.bg);
 changed(false);
+window.cmcStarted = true; // see index.html
