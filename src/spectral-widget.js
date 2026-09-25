@@ -10,7 +10,7 @@
 // (unduloid for alpha on the far side, nodoid on the near side), and alpha snaps onto it.
 // Double-click on empty space adds a branch point; double-click on a branch point removes it.
 // If given a Whitham family, draws the path of each branch point along it, coloured by the Willmore
-// functional W (blue low, red high), with ticks every 0.25 in s and rings at the critical points of W.
+// functional W (blue low, red high), with small rings at the critical points of W.
 
 const R_VIEW = 1.55;       // half-width of the view in lambda units
 const R_MIN = 0.03, R_MAX = 0.97;
@@ -192,26 +192,12 @@ export class SpectralWidget {
         ctx.strokeStyle = ramp(((P[i - 1].W + P[i].W) / 2 - lo) / span);
         ctx.beginPath(); ctx.moveTo(...px[i - 1]); ctx.lineTo(...px[i]); ctx.stroke();
       }
-      // ticks every 0.25 in s (a longer one at s = 0), perpendicular to the path
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = 'rgba(43,38,32,0.75)';
-      ctx.lineWidth = 1;
-      for (let i = 1; i < P.length; i++) {
-        const k0 = Math.floor(P[i - 1].s / 0.25 + 1e-9), k1 = Math.floor(P[i].s / 0.25 + 1e-9);
-        if (k0 === k1) continue;
-        const sk = 0.25 * Math.max(k0, k1);
-        const f = (sk - P[i - 1].s) / (P[i].s - P[i - 1].s);
-        const x = px[i - 1][0] + f * (px[i][0] - px[i - 1][0]), y = px[i - 1][1] + f * (px[i][1] - px[i - 1][1]);
-        let dx = px[i][0] - px[i - 1][0], dy = px[i][1] - px[i - 1][1];
-        const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
-        const L = Math.abs(sk) < 1e-9 ? 6 : 3.5;
-        ctx.beginPath(); ctx.moveTo(x - dy * L, y + dx * L); ctx.lineTo(x + dy * L, y - dx * L); ctx.stroke();
-      }
       // a bar where the curve leaves the allowed region
       for (const [end, i0, i1] of [[F.ends && F.ends.neg, 0, 1], [F.ends && F.ends.pos, P.length - 1, P.length - 2]]) {
         if (!end) continue;
         let dx = px[i0][0] - px[i1][0], dy = px[i0][1] - px[i1][1];
         const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+        ctx.strokeStyle = 'rgba(43,38,32,0.75)';
         ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(px[i0][0] - dy * 5, px[i0][1] + dx * 5); ctx.lineTo(px[i0][0] + dy * 5, px[i0][1] - dx * 5); ctx.stroke();
       }
@@ -219,7 +205,7 @@ export class SpectralWidget {
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = 'rgba(43,38,32,0.9)';
       for (const c of F.critical || []) {
-        ctx.beginPath(); ctx.arc(...px[c], 6.5, 0, 2 * Math.PI); ctx.stroke();
+        ctx.beginPath(); ctx.arc(...px[c], 3.25, 0, 2 * Math.PI); ctx.stroke();
       }
     }
     ctx.restore();

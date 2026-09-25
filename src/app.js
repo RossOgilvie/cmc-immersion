@@ -344,7 +344,7 @@ function slider(parent, { label, min, max, step, get, set, digits = 3, play, rec
   const after = recompute ? changed : writeHashSoon;
   const row = document.createElement('div');
   row.className = 'row';
-  row.innerHTML = `<label>${label}</label><input type="range"><input type="number">`;
+  row.innerHTML = `${label ? `<label>${label}</label>` : ''}<input type="range"><input type="number">`;
   const [rng, num] = row.querySelectorAll('input');
   Object.assign(rng, { min, max, step });
   num.step = step;
@@ -460,23 +460,19 @@ function whithamNote() {
   const g = genus();
   $('whithamBox').querySelectorAll('input, button').forEach((el) => { el.disabled = g < 2; });
   if (g < 2) { $('whithamNote').textContent = 'Needs genus ≥ 2.'; return; }
-  const zr = Math.hypot(...whitham.z), za = Math.atan2(whitham.z[1], whitham.z[0]);
-  const parts = [whitham.s === 0 && !whitham.curve
-    ? 'Moves the branch points keeping the conformal type of the period lattice.'
-    : `lattice scaled by 1/|z| = ${fmt(1 / zr, 4)}` + (Math.abs(za) > 1e-6 ? `, turned by ${fmt(-za, 4)}` : '')];
   const F = family.data;
-  if (F && F.points.length > 1) {
-    const Ws = F.points.map((p) => p.W);
-    // W at the current point: on the family, interpolated in s
-    const P = F.points, s = whitham.s;
-    let i = 1;
-    while (i < P.length - 1 && P[i].s < s) i++;
-    const f = P[i].s > P[i - 1].s ? Math.min(1, Math.max(0, (s - P[i - 1].s) / (P[i].s - P[i - 1].s))) : 0;
-    const Wnow = P[i - 1].W + f * (P[i].W - P[i - 1].W);
-    parts.push(`𝒲 = ${fmt(Wnow, 4)} (family: ${fmt(Math.min(...Ws), 3)} … ${fmt(Math.max(...Ws), 3)})`
-      + (F.critical.length ? `; 𝒲 critical at s = ${F.critical.map((c) => fmt(P[c].s, 3)).join(', ')}` : ''));
+  if (!F || F.points.length < 2) {
+    $('whithamNote').textContent = 'Moves the branch points keeping the conformal type of the period lattice.';
+    return;
   }
-  $('whithamNote').textContent = parts.join(' · ');
+  // W at the current point: on the family, interpolated in s
+  const P = F.points, s = whitham.s;
+  let i = 1;
+  while (i < P.length - 1 && P[i].s < s) i++;
+  const f = P[i].s > P[i - 1].s ? Math.min(1, Math.max(0, (s - P[i - 1].s) / (P[i].s - P[i - 1].s))) : 0;
+  const lines = [`𝒲 = ${fmt(P[i - 1].W + f * (P[i].W - P[i - 1].W), 4)}`];
+  for (const c of F.critical) lines.push(`𝒲 critical at s = ${fmt(P[c].s, 3)}, 𝒲 = ${fmt(P[c].W, 4)}`);
+  $('whithamNote').textContent = lines.join('\n');
 }
 
 // the family (Whitham curve through the current data) for the λ-plane, traced in its own worker so it
@@ -557,11 +553,21 @@ function whithamMove(s) {
   return r.s;
 }
 const whithamSlider = slider($('whithamRow'), {
-  label: 'Whitham s', min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
+  label: '', min: -1.5, max: 1.5, step: 0.002, get: () => whitham.s,
   set: (v) => { whithamMove(v); },
   play: { key: 'whitham' },
 });
-$('whithamReset').addEventListener('click', () => { whithamRecentre(); requestFamily(); });
+{
+  // the recentre button sits beside the play button, same size
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'play';
+  b.id = 'whithamReset';
+  b.textContent = '↻';
+  b.title = 'recentre: make the current spectral curve the centre of the slider';
+  b.addEventListener('click', () => { whithamRecentre(); requestFamily(); });
+  whithamSlider.row.appendChild(b);
+}
 $('showFamily').addEventListener('change', () => { family.key = null; requestFamily(); whithamNote(); });
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
 
