@@ -22,17 +22,20 @@
 // where b_0, b_1 are the coefficients of 1 and lam (the a_1 terms cancel). It is real, and its
 // critical points along the curve are where B_a has a common root.
 
-import { basicPeriods, periodVector, thetaPoly } from './periods.js';
+import { differentials } from './periods.js';
 import { aPoly } from './cmc.js';
 
-const M = 96; // quadrature points per cycle (the segment rule has converged far beyond 1e-12 here)
+const M = 96; // minimum quadrature points per cycle (basicPeriods refines near other branch points)
+// the imaginary part of the period of p over a B-cycle, divided by 2 pi
+const imPeriod = (p, Pj) => p.reduce((acc, c, k) => acc + c[0] * Pj[k][1] + c[1] * Pj[k][0], 0) / (2 * Math.PI);
 
 /** ell_j over the cycles around {0, alpha_j}, with signs aligned to ref (cycle orientations are arbitrary). */
 export function ellVector(alphas, ref = null) {
-  const P = basicPeriods(alphas, M);
-  const v1 = periodVector(alphas, [1, 0], P), v2 = periodVector(alphas, [0, 1], P);
+  // only the B-cycles (around {0, alpha_j}); the A-periods vanish by the reality condition
+  const D = differentials(alphas, M);
+  const p1 = D.poly([1, 0]), p2 = D.poly([0, 1]);
   return alphas.map((_, j) => {
-    let re = v1[2 * j], im = -v2[2 * j];
+    let re = imPeriod(p1, D.B[j]), im = -imPeriod(p2, D.B[j]);
     if (ref && re * ref[j][0] + im * ref[j][1] < 0) { re = -re; im = -im; }
     return [re, im];
   });
@@ -136,11 +139,13 @@ export class WhithamCurve {
       const dy = solve(A, b, m);
       if (!dy.every(Number.isFinite)) return null;
       for (let i = 0; i < m; i++) y[i] += dy[i];
+      // an iterate outside the disc can't converge to an admissible point (and its periods are costly)
+      for (let j = 0; j < n; j += 2) { const r = Math.hypot(y[j], y[j + 1]); if (!(r > 1e-4 && r < 0.9999)) return null; }
       if (Math.hypot(...dy) < tol && res < tol) break;
     }
     if (!(res < Math.max(1e-9, 10 * tol))) return null;
     const alphas = toAlphas(y.slice(0, n));
-    const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 0.02 || r > 0.98; })
+    const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 1e-3 || r > 0.999; })
       || alphas.some((a, i) => alphas.some((c, j) => j > i && Math.hypot(a[0] - c[0], a[1] - c[1]) < 2e-3));
     if (bad) return null;
     const J = this.jacobian(y, ell);
@@ -231,8 +236,8 @@ function solve(A, b, n) {
  * quadrature error.
  */
 export function willmore(alphas, z = [1, 0]) {
-  const P = basicPeriods(alphas, M);
-  const b1 = thetaPoly(alphas, cdiv([1, 0], z), P), b2 = thetaPoly(alphas, cdiv([0, 1], z), P);
+  const D = differentials(alphas, M);
+  const b1 = D.poly(cdiv([1, 0], z)), b2 = D.poly(cdiv([0, 1], z));
   const a = aPoly(alphas);
   const d = [cmul(b1[0], b2[1])[0] - cmul(b2[0], b1[1])[0], cmul(b1[0], b2[1])[1] - cmul(b2[0], b1[1])[1]];
   return cmul([0, 8], cdiv(d, [a[0], a[1]]));

@@ -16,7 +16,7 @@
 // runs from sigma(y) to y); the definition for odd g is open.
 
 import { aPoly } from './cmc.js';
-import { basicPeriods, thetaPoly, periodVector } from './periods.js';
+import { basicPeriods, thetaPolyB } from './periods.js';
 
 const cmul = ([a, b], [c, d]) => [a * c - b * d, a * d + b * c];
 function evalC(p, z) { // p: array of [re, im] by increasing power
@@ -30,8 +30,49 @@ function evalF(a, z) { // a: interleaved Float64Array
   return r;
 }
 
-const M_PERIODS = 128; // quadrature points per cycle (converged to ~1e-13 for moderate |alpha|)
-const N_SYM = 240;     // Simpson intervals around the circle (even)
+const M_PERIODS = 128; // minimum quadrature points per cycle (basicPeriods refines near other branch points)
+
+/** Gauss–Legendre nodes and weights on [-1, 1]. */
+function gaussLegendre(n) {
+  const x = [], w = [];
+  for (let i = 0; i < n; i++) {
+    let z = Math.cos((Math.PI * (i + 0.75)) / (n + 0.5)), dp = 0;
+    for (let it = 0; it < 100; it++) {
+      let p0 = 1, p1 = z;
+      for (let k = 2; k <= n; k++) { const p2 = ((2 * k - 1) * z * p1 - (k - 1) * p0) / k; p0 = p1; p1 = p2; }
+      dp = (n * (z * p1 - p0)) / (z * z - 1);
+      const dz = p1 / dp;
+      z -= dz;
+      if (Math.abs(dz) < 1e-16) break;
+    }
+    x.push(z); w.push(2 / ((1 - z * z) * dp * dp));
+  }
+  const order = x.map((_, i) => i).sort((i, j) => x[i] - x[j]);
+  return { x: order.map((i) => x[i]), w: order.map((i) => w[i]) };
+}
+const GL = gaussLegendre(12);
+
+/** Panels covering [theta0, theta0 + 2 pi], graded towards arg alpha_j at the scale |1 - |alpha_j||. */
+function circlePanels(alphas, theta0) {
+  const T = 2 * Math.PI, pts = [0, T];
+  for (const [re, im] of alphas) {
+    const d = Math.max(1e-7, Math.abs(1 - Math.hypot(re, im)));
+    let c = Math.atan2(im, re) - theta0;
+    c -= T * Math.floor(c / T);
+    pts.push(c);
+    for (let o = d; o < Math.PI; o *= 2) pts.push(c - o, c + o);
+  }
+  const u = [...new Set(pts.filter((t) => t >= 0 && t <= T).map((t) => +t.toFixed(15)))].sort((p, q) => p - q);
+  const panels = [];
+  for (let i = 1; i < u.length; i++) {
+    const n = Math.max(1, Math.ceil((u[i] - u[i - 1]) / 0.3));
+    for (let k = 0; k < n; k++) {
+      const t0 = u[i - 1] + ((u[i] - u[i - 1]) * k) / n, t1 = u[i - 1] + ((u[i] - u[i - 1]) * (k + 1)) / n;
+      if (t1 - t0 > 1e-14) panels.push([theta0 + t0, theta0 + t1]);
+    }
+  }
+  return panels;
+}
 
 /**
  * The spectral data at alphas with Sym point lam0 = e^{i theta0}: the normalised differentials p_1, p_i,
@@ -40,11 +81,11 @@ const N_SYM = 240;     // Simpson intervals around the circle (even)
  */
 export function symData(alphas, theta0) {
   const g = alphas.length;
-  const P = basicPeriods(alphas, M_PERIODS);
-  const p1 = thetaPoly(alphas, [1, 0], P), pi = thetaPoly(alphas, [0, 1], P);
-  const v1 = periodVector(alphas, [1, 0], P), vi = periodVector(alphas, [0, 1], P);
-  // B-cycles are the loops around {0, alpha_j} (even indices); A-periods vanish by the reality condition
-  const Bm = Array.from({ length: g }, (_, j) => [v1[2 * j], vi[2 * j]]);
+  // only the B-cycles (loops around {0, alpha_j}) are needed: the A-periods vanish by the reality condition
+  const P = basicPeriods(alphas, M_PERIODS, 'B');
+  const p1 = thetaPolyB(alphas, [1, 0], P), pi = thetaPolyB(alphas, [0, 1], P);
+  const imPeriod = (p, Pj) => p.reduce((acc, c, k) => acc + c[0] * Pj[k][1] + c[1] * Pj[k][0], 0) / (2 * Math.PI);
+  const Bm = P.map((Pj) => [imPeriod(p1, Pj), imPeriod(pi, Pj)]);
   const lam0 = [Math.cos(theta0), Math.sin(theta0)];
   const roots = [evalC(p1, lam0), evalC(pi, lam0)];
   if (g !== 2) return { g, p1, pi, roots, phi: null };
@@ -53,25 +94,30 @@ export function symData(alphas, theta0) {
     const x = (Bm[1][1] * e0 - Bm[0][1] * e1) / det, y = (-Bm[1][0] * e0 + Bm[0][0] * e1) / det;
     return p1.map((c, k) => [x * c[0] + y * pi[k][0], x * c[1] + y * pi[k][1]]);
   });
-  // q_l(y) = 1/2 int over theta0 .. theta0 + 2 pi of i b(lam) / nu dtheta, nu = sqrt(lam a) continued
+  // q_l(y) = 1/2 int over theta0 .. theta0 + 2 pi of i b(lam) / nu dtheta, nu = sqrt(lam a) continued.
+  // When a branch pair alpha, 1/conj(alpha) straddles the circle closely the integrand has a peak of
+  // width ~ 1 - |alpha| at arg alpha, so the panels are graded geometrically towards each arg alpha_j.
   const a = aPoly(alphas);
-  const h = (2 * Math.PI) / N_SYM, acc = [0, 0];
+  const acc = [0, 0];
   let prev = null;
-  for (let k = 0; k <= N_SYM; k++) {
-    const t = theta0 + k * h, lam = [Math.cos(t), Math.sin(t)];
-    const s = cmul(lam, evalF(a, lam));
-    const m = Math.sqrt(Math.hypot(s[0], s[1])), ph = Math.atan2(s[1], s[0]) / 2;
-    let nu = [m * Math.cos(ph), m * Math.sin(ph)];
-    if (prev && (nu[0] - prev[0]) ** 2 + (nu[1] - prev[1]) ** 2 > (nu[0] + prev[0]) ** 2 + (nu[1] + prev[1]) ** 2) nu = [-nu[0], -nu[1]];
-    prev = nu;
-    const w = (k === 0 || k === N_SYM ? 1 : k % 2 ? 4 : 2) * h / 3, n2 = nu[0] * nu[0] + nu[1] * nu[1];
-    for (let l = 0; l < 2; l++) {
-      const b = evalC(basis[l], lam);
-      // Im(i b / nu) = Re(b / nu)
-      acc[l] += w * (b[0] * nu[0] + b[1] * nu[1]) / n2;
+  for (const [t0, t1] of circlePanels(alphas, theta0)) {
+    const c = (t0 + t1) / 2, r = (t1 - t0) / 2;
+    for (let k = 0; k < GL.x.length; k++) {
+      const t = c + r * GL.x[k], lam = [Math.cos(t), Math.sin(t)];
+      const s = cmul(lam, evalF(a, lam));
+      const m = Math.sqrt(Math.hypot(s[0], s[1])), ph = Math.atan2(s[1], s[0]) / 2;
+      let nu = [m * Math.cos(ph), m * Math.sin(ph)];
+      if (prev && (nu[0] - prev[0]) ** 2 + (nu[1] - prev[1]) ** 2 > (nu[0] + prev[0]) ** 2 + (nu[1] + prev[1]) ** 2) nu = [-nu[0], -nu[1]];
+      prev = nu;
+      const w = r * GL.w[k], n2 = nu[0] * nu[0] + nu[1] * nu[1];
+      for (let l = 0; l < 2; l++) {
+        const bb = evalC(basis[l], lam);
+        acc[l] += w * (bb[0] * nu[0] + bb[1] * nu[1]) / n2; // Im(i b / nu) = Re(b / nu)
+      }
     }
   }
-  return { g, p1, pi, roots, basis, phi: [Math.abs(acc[0] / 2), Math.abs(acc[1] / 2)] };
+  // latticeScale: sqrt of the area of the period lattice (in w = x + iy, p_w = x p_1 + y p_i: Bm^{-1} Z^2)
+  return { g, p1, pi, roots, basis, phi: [Math.abs(acc[0] / 2), Math.abs(acc[1] / 2)], latticeScale: 1 / Math.sqrt(Math.abs(det)) };
 }
 
 /** True when lam0 is (numerically) a common root of B_a, i.e. the data lie on S^g with Sym point lam0. */
@@ -81,8 +127,14 @@ export function onS(alphas, theta0, tol = 1e-6) {
   return Math.hypot(...d.roots[0], ...d.roots[1]) / scale < tol;
 }
 
-const flat = (alphas) => alphas.flat();
-const unflat = (x) => Array.from({ length: x.length / 2 }, (_, j) => [x[2 * j], x[2 * j + 1]]);
+// Unknowns: per branch point (logit |alpha|, arg alpha), so that alpha -> 0 and |alpha| -> 1 are both at
+// infinity and finite-difference steps are relative.
+const R_LO = 1e-6, R_HI = 0.999;
+const flat = (alphas) => alphas.flatMap(([re, im]) => { const r = Math.hypot(re, im); return [Math.log(r / (1 - r)), Math.atan2(im, re)]; });
+const unflat = (x) => Array.from({ length: x.length / 2 }, (_, j) => {
+  const r = 1 / (1 + Math.exp(-x[2 * j])), t = x[2 * j + 1];
+  return [r * Math.cos(t), r * Math.sin(t)];
+});
 
 /** Solves the small dense system A x = b (A square) by Gaussian elimination with partial pivoting. */
 function solveSq(A, b) {
@@ -116,10 +168,7 @@ export class RootFlow {
     if (alphas.length !== 2) throw new Error('The root-preserving flow is implemented for genus 2');
     this.theta0 = theta0;
     this.x = flat(alphas);
-    const d = symData(alphas, theta0);
-    // fixed scale for the root equations (the differentials' size barely changes along a drag)
-    this.rootScale = 1 / Math.max(...d.p1.map(([re, im]) => Math.hypot(re, im)));
-    this.phi = d.phi;
+    this.phi = symData(alphas, theta0).phi;
   }
 
   get alphas() { return unflat(this.x); }
@@ -127,10 +176,12 @@ export class RootFlow {
   /** Residuals: the common root (4 reals, scaled) and phi - target (2). */
   residual(x, target) {
     const alphas = unflat(x);
-    for (const [re, im] of alphas) { const r = Math.hypot(re, im); if (!(r > 0.02 && r < 0.98)) return null; }
-    if (Math.hypot(x[0] - x[2], x[1] - x[3]) < 2e-3) return null;
+    const rs = alphas.map(([re, im]) => Math.hypot(re, im));
+    if (!rs.every((r) => r > R_LO && r < R_HI)) return null;
+    if (Math.hypot(alphas[0][0] - alphas[1][0], alphas[0][1] - alphas[1][1]) < 1e-3 * Math.max(...rs)) return null;
     const d = symData(alphas, this.theta0);
-    const s = this.rootScale;
+    // the root equations relative to the size of the differentials (which scale with alpha)
+    const s = 1 / Math.max(...d.p1.map(([re, im]) => Math.hypot(re, im)));
     return { F: [d.roots[0][0] * s, d.roots[0][1] * s, d.roots[1][0] * s, d.roots[1][1] * s, d.phi[0] - target[0], d.phi[1] - target[1]], phi: d.phi };
   }
 
@@ -194,7 +245,7 @@ export class RootFlow {
       const want = [this.phi[0] + f * dphi[0], this.phi[1] + f * dphi[1]];
       const res = this.correct(this.x, want);
       // reject jumps: a converged point far from the start is on another branch
-      if (res && Math.hypot(...res.x.map((v, i) => v - this.x[i])) < 0.25) {
+      if (res && Math.hypot(...res.x.map((v, i) => v - this.x[i])) < 0.5) {
         this.x = res.x;
         this.phi = res.phi;
         this.tiny = h < step / 32 && f < 1 ? this.tiny + 1 : 0;

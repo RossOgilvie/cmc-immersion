@@ -63,7 +63,7 @@ function parseNum(str) {
 
 const VIEW_DEFAULTS = {
   tau: [], z0: [0, 0], width: 12, height: 12, curv: true, phi: 0,
-  gridStep: 0.25, lineW: 0.6, hmax: 0.05, res: 240,
+  gridStep: 0.25, lineW: 0.6, hmax: 0.05, adaptive: false, res: 240,
 };
 // Widths of the rotational examples are exact closing periods of the parallels, pi / sqrt(det X(lam0)).
 // Bubbletons: a double branch point at the k-th resonance point of the cylinder, where its monodromy is ±I.
@@ -117,7 +117,8 @@ function linkURL() {
   if (state.colour !== 'side') p.set('m', state.colour);
   p.set('g', fmt(state.gridStep));
   if (state.H !== 0.5) p.set('H', fmt(state.H));
-  if (state.hmax !== 0.05) p.set('h', fmt(state.hmax));
+  if (state.adaptive) p.set('h', 'a');
+  else if (state.hmax !== 0.05) p.set('h', fmt(state.hmax));
   if (state.res !== 240) p.set('r', state.res);
   // commas and semicolons are safe in a fragment; keep the link readable
   return `${location.origin}${location.pathname}${location.search}#${p.toString().replace(/%2C/g, ',').replace(/%3B/g, ';')}`;
@@ -140,7 +141,8 @@ function readHash() {
     if (p.has('m')) state.colour = p.get('m');
     if (p.has('g')) state.gridStep = +p.get('g') || state.gridStep;
     if (p.has('H')) state.H = Math.max(0.01, +p.get('H') || 0.5);
-    if (p.has('h')) state.hmax = +p.get('h') || 0.05;
+    state.adaptive = p.get('h') === 'a';
+    if (p.has('h')) state.hmax = state.adaptive ? 0.05 : +p.get('h') || 0.05;
     if (p.has('r')) state.res = Math.min(1024, Math.max(16, +p.get('r') || 240));
   } catch (e) {
     console.warn('bad URL state', e);
@@ -177,12 +179,22 @@ function params(full) {
     phi: state.curv ? null : state.phi, width: state.width, height: state.height,
     nx, ny, hmax: full ? state.hmax : Math.max(state.hmax, 0.1),
   };
+  // error-controlled steps for the full mesh: on request, or when the preview shows the conformal factor
+  // bubbling (near the corner of the spectral data where the branch points go to 0, fixed steps lose it)
+  // (the latest result stands in for the preview while the data move, e.g. along a flow)
+  if (full && (state.adaptive || (state.hmax >= 0.05 && last && uSpread(last) > 7))) p.tol = 1e-9;
   // full meshes: put the rows and columns where the surface is, using the preview's metric
   if (full && state.adapt && last && last.key === surfaceKey() && last.preview) {
     p.sCoords = equidistribute(last, 's', nx);
     p.tCoords = equidistribute(last, 't', ny);
   }
   return p;
+}
+
+function uSpread(res) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of res.u) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  return hi - lo;
 }
 
 /**
@@ -236,7 +248,7 @@ function pump() {
   busyFull = job.full;
   $('busy').classList.add('on');
   const p = params(job.full);
-  jobInfo.set(job.id, { key: surfaceKey(), preview: !job.full });
+  jobInfo.set(job.id, { key: surfaceKey(), preview: !job.full, tol: p.tol || 0 });
   worker.postMessage({ id: job.id, params: p });
 }
 
@@ -294,6 +306,7 @@ function show(res) {
   showStatus(
     `Genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fixed(wrapPi(argQ) / PI, 3)}π` +
     ` · ${res.nx}×${res.ny} in ${res.stats.ms.toFixed(0)} ms · extent ${size.toPrecision(3)}` +
+    (res.tol ? ' · adaptive steps' : '') +
     (res.stats.detDefect > 1e-6 ? ` · det drift ${res.stats.detDefect.toExponential(1)}` : ''),
     false,
   );
@@ -546,6 +559,8 @@ const appearanceSliders = [
   }),
 ];
 
+$('showDivisor').addEventListener('change', () => widget.set({ showDivisor: $('showDivisor').checked }));
+
 $('curv').addEventListener('change', () => {
   state.curv = $('curv').checked;
   $('phiRow').classList.toggle('hide', state.curv);
@@ -588,7 +603,7 @@ let commonRoots = [];
 
 // Active when lam0 sits on a common root of the differentials (the data are on S^2). The pad shows the
 // Sym integrals (phi_1, phi_2); dragging sets a target that the flow chases, a little per frame.
-const root = { flow: null, key: null, target: null, dragging: false, running: false };
+const root = { flow: null, key: null, target: null, dragging: false, running: false, scale: null };
 const rootKey = () => JSON.stringify([state.alphas, state.theta0]);
 const pad = new SymPad($('symPad'), (phi, dragging) => {
   root.target = phi;
@@ -640,7 +655,10 @@ function rootChase() {
     if (!root.target || genus() !== 2) { root.running = false; return; }
     let r;
     try {
-      if (!root.flow) root.flow = new RootFlow(state.alphas, state.theta0);
+      if (!root.flow) {
+        root.flow = new RootFlow(state.alphas, state.theta0);
+        root.scale = symData(state.alphas, state.theta0).latticeScale;
+      }
       r = root.flow.moveToward(root.target, { budget: 12 });
     } catch (e) {
       root.running = false;
@@ -649,6 +667,15 @@ function rootChase() {
     }
     state.alphas = r.alphas;
     root.key = rootKey();
+    // the period lattice changes size along the flow (it shrinks like sqrt|alpha| towards phi = 0):
+    // scale the domain with it
+    const scale = symData(state.alphas, state.theta0).latticeScale;
+    if ($('rootDomain').checked && root.scale && Number.isFinite(scale)) {
+      const f = scale / root.scale;
+      state.width *= f; state.height *= f; state.z0 = state.z0.map((v) => v * f);
+      for (const sl of domainSliders) sl.refresh();
+    }
+    root.scale = scale;
     widget.set({ alphas: state.alphas });
     refreshAlphaValues();
     pad.set({ phi: r.phi, blocked: r.blocked });
@@ -685,6 +712,7 @@ function whithamNote() {
   const g = genus();
   $('whithamBox').querySelectorAll('input, button').forEach((el) => { el.disabled = g < 2; });
   $('whithamNote').textContent = g < 2 ? 'Needs genus ≥ 2.' : '';
+  toRootState();
 }
 
 // W at the current spectral data, in the frame of the slider's centre (the curve's anchor)
@@ -736,6 +764,7 @@ function pumpFamily() {
       if (genus() >= 2) {
         family.data = error ? null : result;
         showFamily();
+        toRootState();
         whithamSlider.setRange(...familyRange());
         whithamSlider.refresh();
       }
@@ -858,6 +887,31 @@ const whithamSlider = slider($('whithamRow'), {
   play: { key: 'whitham' },
 });
 $('showFamily').addEventListener('change', showFamily);
+
+// "Flow to common root": to the nearest critical point of W along the family (where the differentials
+// have a common root on the unit circle), then put lam0 on that root, which switches on the pad
+function toRootState() {
+  $('toRoot').disabled = genus() < 2 || !criticalS().length;
+}
+$('toRoot').addEventListener('click', () => {
+  if (anim) stopAnim();
+  const nearest = () => criticalS().reduce((m, c) => (m === null || Math.abs(c - whitham.s) < Math.abs(m - whitham.s) ? c : m), null);
+  let s = nearest();
+  if (s === null) return;
+  whithamMove(s);          // creates the accurate curve if needed ...
+  s = nearest();           // ... so the critical point can be refined on it
+  whithamMove(s);
+  whithamSlider.refresh();
+  updateCommonRoots();
+  if (commonRoots.length) {
+    const d = ([re, im]) => Math.abs(wrapPi(Math.atan2(im, re) - state.theta0));
+    const r = commonRoots.reduce((m, c) => (d(c) < d(m) ? c : m));
+    state.theta0 = Math.atan2(r[1], r[0]);
+    widget.set({ theta0: state.theta0 });
+    refreshAlphaValues();
+  }
+  changed(false);
+});
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
 
 // ------------------------------------------------------------------ closing up
@@ -914,7 +968,11 @@ function setBackground(c) {
 }
 $('adapt').addEventListener('change', () => { state.adapt = $('adapt').checked; changed(false); });
 $('res').addEventListener('change', () => { state.res = +$('res').value; changed(false); });
-$('acc').addEventListener('change', () => { state.hmax = +$('acc').value; changed(false); });
+$('acc').addEventListener('change', () => {
+  state.adaptive = $('acc').value === 'adaptive';
+  state.hmax = state.adaptive ? 0.05 : +$('acc').value;
+  changed(false);
+});
 
 // ------------------------------------------------------------------ animation
 
@@ -1031,7 +1089,7 @@ function refreshAll() {
   for (const s of [...domainSliders, phiSlider, ...appearanceSliders, Hslider]) s.refresh();
   $('res').value = String(state.res);
   if (!$('res').value) { $('res').add(new Option(String(state.res), String(state.res))); $('res').value = String(state.res); }
-  $('acc').value = String(state.hmax);
+  $('acc').value = state.adaptive ? 'adaptive' : String(state.hmax);
   if (!$('acc').value) { $('acc').add(new Option(`h ≤ ${state.hmax}`, String(state.hmax))); $('acc').value = String(state.hmax); }
   viewer.setScale(1 / (2 * state.H));
   $('closeInfo').textContent = '';

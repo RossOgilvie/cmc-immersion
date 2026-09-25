@@ -22,7 +22,7 @@ import { aPoly, kappa0 } from './cmc.js';
  *   dlam/(lam nu) = (1/a0) (a'(lam) - (a(lam) - a0)/lam) dlam/nu - (2/a0) d(nu/lam).
  * Returns, for each cycle, the periods of lam^k dlam/(lam nu) for k = 0..g+1 as [re, im] pairs.
  */
-export function basicPeriods(alphas, M = 256) {
+export function basicPeriods(alphas, Mmin = 256, which = 'all') {
   const g = alphas.length;
   const a = aPoly(alphas);
   // P(lam) = a'(lam) - (a(lam) - a0)/lam, coefficients by increasing power (degree <= 2g - 1)
@@ -38,12 +38,28 @@ export function basicPeriods(alphas, M = 256) {
     roots.push({ e: [ar / r2, ai / r2], c: [-ar, ai] }); // 1 - conj(a) lam = -conj(a) (lam - 1/conj(a))
   }
   const cycles = [];
-  for (let j = 0; j < g; j++) cycles.push([0, 1 + 2 * j], [1 + 2 * j, 2 + 2 * j]);
+  for (let j = 0; j < g; j++) {
+    cycles.push([0, 1 + 2 * j]);
+    if (which !== 'B') cycles.push([1 + 2 * j, 2 + 2 * j]);
+  }
 
   return cycles.map(([i1, i2]) => {
     const e1 = roots[i1].e, e2 = roots[i2].e;
     const mr = (e1[0] + e2[0]) / 2, mi = (e1[1] + e2[1]) / 2;
     const hr = (e2[0] - e1[0]) / 2, hi = (e2[1] - e1[1]) / 2;
+    // resolution from the nearest other branch point: in the parameter phi it sits at imaginary distance
+    // eta = acosh((|w - 1| + |w + 1|)/2), w = (e - m)/h, and the (2 pi-periodic, even) trapezoid rule
+    // converges like exp(-2 M eta). Needed when a branch point comes close to the segment: alpha -> 0
+    // (the segment alpha .. 1/conj(alpha) passes by 0) or |alpha| -> 1 (alpha next to 1/conj(alpha)).
+    let eta = Infinity;
+    const h2 = hr * hr + hi * hi;
+    roots.forEach(({ e }, i) => {
+      if (i === i1 || i === i2) return;
+      const dr = e[0] - mr, di = e[1] - mi;
+      const wr = (dr * hr + di * hi) / h2, wi = (di * hr - dr * hi) / h2;
+      eta = Math.min(eta, Math.acosh((Math.hypot(wr - 1, wi) + Math.hypot(wr + 1, wi)) / 2));
+    });
+    const M = Math.min(200000, Math.max(Mmin, Math.ceil(18 / eta)));
     // constant from the two removed factors
     let kr = 1, ki = 0;
     for (const i of [i1, i2]) { const [cr, ci] = roots[i].c; const t = kr * cr - ki * ci; ki = kr * ci + ki * cr; kr = t; }
@@ -111,6 +127,65 @@ export function thetaPoly(alphas, w, periods = basicPeriods(alphas)) {
   const sol = solve(Amat, rhs, n);
   for (let k = 1; k <= g; k++) p[k] = [sol[2 * k - 2], sol[2 * k - 1]];
   return p;
+}
+
+/**
+ * p_w as thetaPoly, from the B-cycles alone (basicPeriods(alphas, M, 'B')): the reality condition
+ * p_{g+1-k} = c conj(p_k), c = -a_{2g} / conj(a_0), makes the periods on the A-cycles {alpha_j, 1/conj alpha_j}
+ * vanish identically, leaving g real conditions Re oint_{B_j} = 0 for the g real unknowns. This avoids
+ * the A-cycle segments, which get very long as alpha -> 0 (and pass close to the branch point 0).
+ * Even g only: for odd g these conditions are dependent (the real locus over |lam| = 1 then has two
+ * components), so use differentials(), which falls back to all cycles.
+ */
+export function thetaPolyB(alphas, w, Bperiods) {
+  const g = alphas.length;
+  const a = aPoly(alphas);
+  const kap = kappa0(alphas);
+  const [wr, wi] = w;
+  const a0r = a[0], a0i = a[1], aTr = a[4 * g], aTi = a[4 * g + 1];
+  const p = Array.from({ length: g + 2 }, () => [0, 0]);
+  p[0] = [-(wr * a0r - wi * a0i) / (2 * kap), -(wr * a0i + wi * a0r) / (2 * kap)];
+  p[g + 1] = [(wr * aTr + wi * aTi) / (2 * kap), (wr * aTi - wi * aTr) / (2 * kap)];
+  if (g === 0) return p;
+  const d = a0r * a0r + a0i * a0i;
+  const c = [-(aTr * a0r - aTi * a0i) / d, -(aTi * a0r + aTr * a0i) / d]; // -a_{2g} / conj(a_0), unimodular
+  const mul = ([x, y], [u, v]) => [x * u - y * v, x * v + y * u];
+  // unknowns: for k = 1 .. floor(g/2) the real and imaginary parts of p_k (p_{g+1-k} = c conj p_k);
+  // for odd g also t with p_m = sqrt(c) t at the middle index m = (g+1)/2
+  const pairs = Math.floor(g / 2), sq = [Math.cos(Math.atan2(c[1], c[0]) / 2), Math.sin(Math.atan2(c[1], c[0]) / 2)];
+  const A = [], rhs = [];
+  for (const P of Bperiods) {
+    let f = 0;
+    for (const k of [0, g + 1]) f += p[k][0] * P[k][0] - p[k][1] * P[k][1];
+    const row = [];
+    for (let k = 1; k <= pairs; k++) {
+      const cP = mul(c, P[g + 1 - k]);
+      row.push(P[k][0] + cP[0], -P[k][1] + cP[1]); // coefficients of Re p_k, Im p_k
+    }
+    if (g % 2) row.push(mul(sq, P[(g + 1) / 2])[0]);
+    A.push(row); rhs.push(-f);
+  }
+  const sol = solve(A, rhs, g);
+  for (let k = 1; k <= pairs; k++) {
+    p[k] = [sol[2 * k - 2], sol[2 * k - 1]];
+    p[g + 1 - k] = mul(c, [p[k][0], -p[k][1]]);
+  }
+  if (g % 2) p[(g + 1) / 2] = [sq[0] * sol[g - 1], sq[1] * sol[g - 1]];
+  return p;
+}
+
+/**
+ * The differentials p_w and the periods on the B-cycles (around {0, alpha_j}), by the cheapest exact
+ * route: B-cycles and the reality condition for even g, all cycles for odd g.
+ * Returns { B: [periods per B-cycle], poly: (w) => p_w }.
+ */
+export function differentials(alphas, Mmin = 256) {
+  const even = alphas.length % 2 === 0;
+  const P = basicPeriods(alphas, Mmin, even ? 'B' : 'all');
+  return {
+    B: even ? P : P.filter((_, i) => i % 2 === 0),
+    poly: (w) => (even ? thetaPolyB(alphas, w, P) : thetaPoly(alphas, w, P)),
+  };
 }
 
 /** Imaginary parts of the periods of Theta_w divided by 2 pi, one per cycle. */
@@ -188,9 +263,10 @@ function solve(A, b, n) {
  * S^1 are stable; a common root is one of them where p_i vanishes too.
  * Returns [{ lam: [re, im], defect }] with defect = |p_i(lam)| / max|coefficients of p_i| < tol.
  */
-export function commonRootsOnCircle(alphas, tol = 1e-6, periods = basicPeriods(alphas)) {
+export function commonRootsOnCircle(alphas, tol = 1e-6) {
   if (alphas.length < 1) return [];
-  const p1 = thetaPoly(alphas, [1, 0], periods), pi = thetaPoly(alphas, [0, 1], periods);
+  const D = differentials(alphas);
+  const p1 = D.poly([1, 0]), pi = D.poly([0, 1]);
   const c1 = Float64Array.from(p1.flat()), ci = Float64Array.from(pi.flat());
   const scale = Math.max(...pi.map(([re, im]) => Math.hypot(re, im)));
   const out = [];

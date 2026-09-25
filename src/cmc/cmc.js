@@ -271,7 +271,9 @@ export class FrameIntegrator {
     this.Xd = new Float64Array(8);
     this.k1 = new Float64Array(len); this.k2 = new Float64Array(len);
     this.k3 = new Float64Array(len); this.k4 = new Float64Array(len);
-    this.tmp = new Float64Array(len);
+    this.k5 = new Float64Array(len); this.k6 = new Float64Array(len); this.k7 = new Float64Array(len);
+    this.tmp = new Float64Array(len); this.ynew = new Float64Array(len);
+    this.hPrev = 0;
   }
 
   /** Initial state from a Killing field: F = I, G = 0. */
@@ -311,7 +313,8 @@ export class FrameIntegrator {
    * Advance y in place by distance t along direction c = (cr, ci), |c| = 1, with RK4 steps
    * h <= hmax / max(1, |G|): the generator ~ zeta/kappa0 is fast where kappa0 is small or u large.
    */
-  march(y, cr, ci, t, hmax) {
+  march(y, cr, ci, t, hmax, tol = 0) {
+    if (tol > 0) { this.marchAdaptive(y, cr, ci, t, hmax, tol); return; }
     const len = this.len, Gen = this.Gen;
     const { k1, k2, k3, k4, tmp } = this;
     let left = Math.abs(t);
@@ -332,6 +335,62 @@ export class FrameIntegrator {
       this.rhs(tmp, k4, cr, ci);
       for (let e = 0; e < len; e++) y[e] += (h / 6) * (k1[e] + 2 * k2[e] + 2 * k3[e] + k4[e]);
     }
+  }
+
+  /**
+   * As march, with error-controlled Dormand–Prince 5(4) steps: each step keeps the local error below
+   * tol (1 + |y|) componentwise, and hmax / max(1, |G|) stays an upper bound. Near the corner of the
+   * spectral data where the branch points go to 0 the conformal factor develops sharp bubbles, and the
+   * step then shrinks only inside them. The step size carries over between calls.
+   */
+  marchAdaptive(y, cr, ci, t, hmax, tol) {
+    const len = this.len, Gen = this.Gen;
+    let { k1, k2, k3, k4, k5, k6, k7 } = this;
+    const { tmp } = this;
+    let ynew = this.ynew;
+    const sgn = Math.sign(t);
+    let left = Math.abs(t);
+    let h = this.hPrev > 0 ? this.hPrev : hmax;
+    this.rhs(y, k1, cr, ci);
+    const stage = (k, coef) => {
+      for (let e = 0; e < len; e++) {
+        let s = 0;
+        for (const [c, kk] of coef) s += c * kk[e];
+        tmp[e] = y[e] + s;
+      }
+      this.rhs(tmp, k, cr, ci);
+    };
+    while (left > 1e-14) {
+      let gmax = 0;
+      for (let e = 0; e < 24; e++) gmax = Math.max(gmax, Math.abs(Gen[e]));
+      const hh = Math.min(h, hmax / Math.max(1, gmax), left), sh = sgn * hh;
+      stage(k2, [[sh / 5, k1]]);
+      stage(k3, [[sh * 3 / 40, k1], [sh * 9 / 40, k2]]);
+      stage(k4, [[sh * 44 / 45, k1], [-sh * 56 / 15, k2], [sh * 32 / 9, k3]]);
+      stage(k5, [[sh * 19372 / 6561, k1], [-sh * 25360 / 2187, k2], [sh * 64448 / 6561, k3], [-sh * 212 / 729, k4]]);
+      stage(k6, [[sh * 9017 / 3168, k1], [-sh * 355 / 33, k2], [sh * 46732 / 5247, k3], [sh * 49 / 176, k4], [-sh * 5103 / 18656, k5]]);
+      for (let e = 0; e < len; e++) {
+        ynew[e] = y[e] + sh * (35 / 384 * k1[e] + 500 / 1113 * k3[e] + 125 / 192 * k4[e] - 2187 / 6784 * k5[e] + 11 / 84 * k6[e]);
+      }
+      this.rhs(ynew, k7, cr, ci); // FSAL: the first stage of the next step (and Gen at ynew)
+      let err = 0;
+      for (let e = 0; e < len; e++) {
+        const d = sh * (71 / 57600 * k1[e] - 71 / 16695 * k3[e] + 71 / 1920 * k4[e] - 17253 / 339200 * k5[e] + 22 / 525 * k6[e] - 1 / 40 * k7[e]);
+        err = Math.max(err, Math.abs(d) / (tol * (1 + Math.abs(y[e]))));
+      }
+      if (err <= 1 || hh < 1e-12) {
+        [y, ynew] = [ynew, y]; // accept (swap buffers; copied back below)
+        [k1, k7] = [k7, k1];
+        left -= hh;
+      } else {
+        this.rhs(y, k1, cr, ci); // restore Gen at y for the step bound
+      }
+      h = hh * Math.min(5, Math.max(0.2, 0.9 * Math.pow(Math.max(err, 1e-10), -0.2)));
+    }
+    this.hPrev = h;
+    // the caller's array must hold the result: after an odd number of swaps it lives in this.ynew
+    if (y !== arguments[0]) { arguments[0].set(y); this.ynew = y; } else { this.ynew = ynew; }
+    this.k1 = k1; this.k7 = k7;
   }
 
   /** Re-impose the Killing-field structure and F in SU(2). */
@@ -412,7 +471,7 @@ export function hopfArg(alphas, theta0) {
  */
 export function computeSurface(params) {
   const t0 = (typeof performance !== 'undefined' ? performance : Date).now();
-  const { alphas, theta0, tau = [], z0 = [0, 0], width, height, hmax = 0.02 } = params;
+  const { alphas, theta0, tau = [], z0 = [0, 0], width, height, hmax = 0.02, tol = 0 } = params;
   const nx = params.sCoords ? params.sCoords.length : params.nx;
   const ny = params.tCoords ? params.tCoords.length : params.ny;
   const g = alphas.length;
@@ -428,7 +487,7 @@ export function computeSurface(params) {
   const I = new FrameIntegrator(alphas, theta0);
   const y0 = I.initialState(Z);
   const r0 = Math.hypot(z0[0], z0[1]);
-  if (r0 > 0) I.march(y0, z0[0] / r0, z0[1] / r0, r0, hmax);
+  if (r0 > 0) I.march(y0, z0[0] / r0, z0[1] / r0, r0, hmax, tol);
   I.project(y0);
 
   const N = nx * ny;
@@ -453,7 +512,7 @@ export function computeSurface(params) {
       const idx = coords.map((_, i) => i).filter((i) => (dir > 0 ? coords[i] >= 0 : coords[i] < 0));
       if (dir < 0) idx.reverse();
       for (const i of idx) {
-        I.march(y, cr, ci, coords[i] - at, hmax);
+        I.march(y, cr, ci, coords[i] - at, hmax, tol);
         at = coords[i];
         I.project(y);
         visit(i, y);

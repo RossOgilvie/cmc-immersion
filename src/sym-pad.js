@@ -136,9 +136,12 @@ export class SymPad {
     ctx.fillStyle = muted;
     ctx.font = `13px ${FONT}`;
     ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    ctx.fillText('0', x0, y0 + 4); ctx.fillText('π', x0 + s, y0 + 4); ctx.fillText('φ₁', x0 + s / 2, y0 + 4);
+    ctx.fillText('0', x0, y0 + 4); ctx.fillText('π', x0 + s, y0 + 4);
+    subLabel(ctx, FONT, '1', x0 + s / 2, y0 + 10, 'center');
     ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
-    ctx.fillText('π', x0 - 6, y0 - s); ctx.fillText('φ₂', x0 - 6, y0 - s / 2);
+    ctx.fillText('π', x0 - 6, y0 - s);
+    subLabel(ctx, FONT, '2', x0 - 6, y0 - s / 2, 'right');
+    ctx.font = `13px ${FONT}`;
     ctx.save();
     ctx.font = `italic 12px ${FONT}`;
     ctx.translate(x0 + s * 0.3, y0 - s * 0.3);
@@ -160,6 +163,21 @@ export class SymPad {
     ctx.fillStyle = accent;
     ctx.beginPath(); ctx.arc(x, y, this.drag ? 6 : 5, 0, 2 * Math.PI); ctx.fill();
   }
+}
+
+/** phi with a subscript, the pair aligned at (x, y) (vertically centred), anchored left/center/right. */
+function subLabel(ctx, FONT, sub, x, y, align) {
+  ctx.font = `italic 14px ${FONT}`;
+  const wb = ctx.measureText('φ').width;
+  ctx.font = `10px ${FONT}`;
+  const ws = ctx.measureText(sub).width;
+  const left = align === 'center' ? x - (wb + ws) / 2 : align === 'right' ? x - wb - ws : x;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = `italic 14px ${FONT}`;
+  ctx.fillText('φ', left, y);
+  ctx.font = `10px ${FONT}`;
+  ctx.fillText(sub, left + wb, y + 4);
 }
 
 /** The rationals in [0, 1] with denominator <= Q_MAX. */

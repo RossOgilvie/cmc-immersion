@@ -15,7 +15,7 @@
 // Labels sit on the side of each point away from the origin and from its own trail.
 
 const R_VIEW = 1.25;       // half-width of the view in lambda units
-const R_MIN = 0.03, R_MAX = 0.97;
+const R_MIN = 0.001, R_MAX = 0.999;
 export const MAX_GENUS = 8;
 
 export class SpectralWidget {
@@ -28,6 +28,7 @@ export class SpectralWidget {
     this.theta0 = 0;
     this.divisor = [];
     this.commonRoots = [];
+    this.showDivisor = true;
     this.drag = null;
     this.hover = null;
     this.colours = {};
@@ -45,6 +46,7 @@ export class SpectralWidget {
     if (divisor) this.divisor = divisor;
     if ('family' in opts) this.family = opts.family;
     if ('commonRoots' in opts) this.commonRoots = opts.commonRoots || [];
+    if ('showDivisor' in opts) this.showDivisor = opts.showDivisor;
     this.draw();
   }
 
@@ -301,7 +303,7 @@ export class SpectralWidget {
     ctx.strokeStyle = muted;
     ctx.fillStyle = muted;
     ctx.lineWidth = 1.3;
-    for (const { mu } of this.divisor) {
+    for (const { mu } of this.showDivisor ? this.divisor : []) {
       let p = this._toPx(mu);
       const m = 8;
       const out = p[0] < m || p[0] > w - m || p[1] < m || p[1] > h - m;
