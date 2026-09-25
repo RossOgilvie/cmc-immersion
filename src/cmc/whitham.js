@@ -142,7 +142,8 @@ export class WhithamCurve {
       // an iterate outside the disc can't converge to an admissible point (and its periods are costly)
       for (let j = 0; j < n; j += 2) {
         const r = Math.hypot(y[j], y[j + 1]);
-        if (!(r > 1e-4 && r < 0.9999)) { this.fail = r >= 0.9999 ? 'circle' : 'zero'; return null; }
+        // (a diverging iterate: says nothing about where the curve goes)
+        if (!(r > 1e-4 && r < 0.9999)) { this.fail = 'newton'; return null; }
       }
       if (Math.hypot(...dy) < tol && res < tol) break;
     }
@@ -182,8 +183,10 @@ export class WhithamCurve {
   /**
    * Why the curve ends after point p, given how the last step failed: { kind, idx } with kind 'circle'
    * (the branch points idx reach the unit circle), 'zero' (they reach 0), 'collision' (the two branch
-   * points idx meet inside the disc: a singular spectral curve) or 'other'. When the corrector just fails
-   * to converge, the nearest of these obstacles is named if it is close.
+   * points idx meet inside the disc: a singular spectral curve), 'cycle' (branch point idx[0] lies on the
+   * segment [0, alpha_idx[1]] along which the B-cycle is integrated: the numerical cycle changes its
+   * homology class there, a limitation of the numerics, not an end of the family) or 'other'. When the
+   * corrector just fails to converge, the nearest of these obstacles is named if it is close.
    */
   endReason(p, fail) {
     const al = this.describe(p).alphas, rs = al.map(([re, im]) => Math.hypot(re, im));
@@ -197,7 +200,14 @@ export class WhithamCurve {
     const near = (dist) => { const d = rs.map(dist), m = Math.min(...d); return d.map((v, i) => (v < 1.5 * m + 0.005 ? i : -1)).filter((i) => i >= 0); };
     if (fail === 'circle' || (fail === 'newton' && rs[iMax] > 0.95)) return { kind: 'circle', idx: near((r) => 1 - r) };
     if (fail === 'zero' || (fail === 'newton' && rs[iMin] < 0.05)) return { kind: 'zero', idx: near((r) => r) };
-    if (fail === 'collision' || (fail === 'newton' && pair && pair.d < 0.02)) return { kind: 'collision', idx: [pair.i, pair.j] };
+    // two branch points meeting: close relative to their size (near 0 everything is close in absolute terms)
+    if (fail === 'collision' || (fail === 'newton' && pair && pair.d < 0.02 * Math.max(rs[pair.i], rs[pair.j]))) return { kind: 'collision', idx: [pair.i, pair.j] };
+    for (let j = 0; j < al.length; j++) for (let k = 0; k < al.length; k++) {
+      if (k === j) continue;
+      const [bx, by] = al[j], L2 = bx * bx + by * by, [ax, ay] = al[k];
+      const u = (ax * bx + ay * by) / L2, v = (bx * ay - by * ax) / Math.sqrt(L2);
+      if (u > 0 && u < 1 && Math.abs(v) < 1e-3 * Math.sqrt(L2)) return { kind: 'cycle', idx: [k, j] };
+    }
     return { kind: 'other', idx: [] };
   }
 

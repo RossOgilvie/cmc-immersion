@@ -830,6 +830,7 @@ function endText(e) {
   if (e.kind === 'circle') return `${who} ${plural ? 'reach' : 'reaches'} the unit circle`;
   if (e.kind === 'zero') return `${who} ${plural ? 'reach' : 'reaches'} 0`;
   if (e.kind === 'collision') return `${a(e.idx[0])} and ${a(e.idx[1])} meet`;
+  if (e.kind === 'cycle') return `the numerics fail: ${a(e.idx[0])} crosses the period cycle of ${a(e.idx[1])}`;
   return 'the continuation fails (other)';
 }
 function showEnds() {
