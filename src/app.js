@@ -288,7 +288,7 @@ function show(res) {
   const argQ = hopfArg(state.alphas, state.theta0);
   const size = Math.max(res.bbox[3] - res.bbox[0], res.bbox[4] - res.bbox[1], res.bbox[5] - res.bbox[2]) / (2 * state.H);
   showStatus(
-    `genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fixed(wrapPi(argQ) / PI, 3)}π` +
+    `Genus ${g} · H = ${fmt(state.H, 3)} · κ₀ = ${fmt(kappa0(state.alphas), 3)} · arg Q = ${fixed(wrapPi(argQ) / PI, 3)}π` +
     ` · ${res.nx}×${res.ny} in ${res.stats.ms.toFixed(0)} ms · extent ${size.toPrecision(3)}` +
     (res.stats.detDefect > 1e-6 ? ` · det drift ${res.stats.detDefect.toExponential(1)}` : ''),
     false,
@@ -305,9 +305,6 @@ const wrapPi = (x) => x - 2 * PI * Math.round(x / (2 * PI));
 
 // ------------------------------------------------------------------ spectral widget and alpha list
 
-// the selected branch point (ringed in the disc, highlighted in the list; − removes it); not in the URL
-let selected = -1;
-
 const widget = new SpectralWidget($('lam'), (s, dragging) => {
   const gOld = genus();
   state.alphas = s.alphas;
@@ -315,13 +312,7 @@ const widget = new SpectralWidget($('lam'), (s, dragging) => {
   if (genus() !== gOld) genusChanged();
   else refreshAlphaValues();
   changed(dragging);
-}, (i) => select(i));
-
-function select(i) {
-  selected = genus() ? Math.max(0, Math.min(genus() - 1, i)) : -1;
-  widget.set({ selected });
-  [...$('alphaList').children].forEach((row, j) => row.classList.toggle('sel', j === selected));
-}
+});
 
 function genusChanged() {
   whithamRecentre();
@@ -330,13 +321,11 @@ function genusChanged() {
   buildAlphaList();
   buildTau();
   widget.set({ alphas: state.alphas, theta0: state.theta0, divisor: [] });
-  select(selected);
 }
 
 function removeAlpha(i) {
   if (i < 0 || i >= genus()) return;
   state.alphas.splice(i, 1);
-  selected = Math.min(i, genus() - 1);
   genusChanged();
   changed(false);
 }
@@ -347,11 +336,11 @@ function buildAlphaList() {
   state.alphas.forEach((_, i) => {
     const row = document.createElement('div');
     row.className = 'bprow';
-    row.innerHTML = `<button class="disc" type="button" aria-label="Select α${i + 1}">α<sub>${i + 1}</sub></button>
+    row.innerHTML = `<span class="name">α<sub>${i + 1}</sub></span>
       <span class="lab">r</span><input class="num" type="text" inputmode="decimal" autocomplete="off" aria-label="Modulus of α${i + 1}">
       <span class="lab">arg</span><input class="num" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of α${i + 1} in units of π">
       <span class="muted">π</span>
-      <button class="gly" type="button" data-glyph="cross" aria-label="Remove α${i + 1}" title="remove"></button>`;
+      <button class="gly" type="button" data-glyph="cross" aria-label="Remove α${i + 1}" title="Remove"></button>`;
     glyphs(row);
     const [r, t] = row.querySelectorAll('input');
     const update = () => {
@@ -367,9 +356,7 @@ function buildAlphaList() {
       inp.addEventListener('change', update);
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
     }
-    row.addEventListener('focusin', () => select(i));
-    row.addEventListener('click', () => select(i));
-    row.querySelector('.gly').addEventListener('click', (e) => { e.stopPropagation(); removeAlpha(i); });
+    row.querySelector('.gly').addEventListener('click', () => removeAlpha(i));
     box.appendChild(row);
   });
   $('genus').textContent = String(genus());
@@ -406,11 +393,10 @@ $('addAlpha').addEventListener('click', () => {
     if (d > bestD) { bestD = d; best = z; }
   }
   state.alphas.push(best);
-  selected = genus() - 1;
   genusChanged();
   changed(false);
 });
-$('remAlpha').addEventListener('click', () => removeAlpha(selected >= 0 ? selected : genus() - 1));
+$('remAlpha').addEventListener('click', () => removeAlpha(genus() - 1));
 
 // ------------------------------------------------------------------ sliders
 
@@ -426,7 +412,7 @@ function slider(parent, { label, min: lo, max: hi, step, get, set, digits = 3, u
   const id = `sl${(slider.n = (slider.n || 0) + 1)}`;
   const row = document.createElement('div');
   row.className = 'sl';
-  row.innerHTML = `<label for="${id}">${label}</label><div class="trk"><button type="button" class="tag" title="click to type a value"></button>` +
+  row.innerHTML = `<label for="${id}">${label}</label><div class="trk"><button type="button" class="tag" title="Click to type a value"></button>` +
     `<input type="range" class="rng" id="${id}"></div><div class="acts"></div>`;
   const rng = row.querySelector('input'), tag = row.querySelector('.tag'), trk = row.querySelector('.trk');
   const acts = row.querySelector('.acts');
@@ -458,7 +444,7 @@ function slider(parent, { label, min: lo, max: hi, step, get, set, digits = 3, u
     let v = +rng.value;
     if (snap) {
       const px = (rng.clientWidth - 13) / (max - min);
-      for (const c of snap()) if (Math.abs(v - c) * px < 6) v = c;
+      for (const c of snap()) if (Math.abs(v - c) * px < 3) v = c;
     }
     set(v);
     refresh();
@@ -507,7 +493,7 @@ function slider(parent, { label, min: lo, max: hi, step, get, set, digits = 3, u
     acts.appendChild(b);
     return b;
   };
-  if (play) button('play', 'animate', (b) => toggleAnim(play, b));
+  if (play) button('play', 'Animate', (b) => toggleAnim(play, b));
   if (reset) button('reset', reset.title, reset.onClick);
   parent.appendChild(row);
   refresh();
@@ -529,29 +515,28 @@ function buildTau() {
     label: `<i>τ</i><sub>${i + 1}</sub>`, min: -2 * PI, max: 2 * PI, step: 0.001,
     get: () => state.tau[i], set: (v) => { state.tau[i] = v; },
     play: { key: 'tau', i },
-    reset: { title: `set τ${i + 1} back to 0`, onClick: () => { state.tau[i] = 0; tauSliders[i].refresh(); changed(false); } },
+    reset: { title: `Set τ${i + 1} back to 0`, onClick: () => { state.tau[i] = 0; tauSliders[i].refresh(); changed(false); } },
   }));
   const g = genus();
-  $('tauNote').textContent = g >= 3
-    ? `${g === 3 ? 'Time along the shape-changing isospectral flow' : `Times along the ${g - 2} shape-changing isospectral flows`} (the other two flows are translations of the domain).`
+  $('tauNote').textContent = g >= 3 ? ''
     : 'For genus ≤ 2 every isospectral deformation is a translation of the domain: use the domain centre below.';
 }
 
 const domainSliders = [
-  slider($('domainRows'), { label: '<i>x</i><sub>0</sub>', title: 'centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[0], set: (v) => { state.z0[0] = v; } }),
-  slider($('domainRows'), { label: '<i>y</i><sub>0</sub>', title: 'centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[1], set: (v) => { state.z0[1] = v; } }),
-  slider($('domainRows'), { label: 'width', min: 0.5, max: 40, step: 0.001, get: () => state.width, set: (v) => { state.width = Math.max(0.05, v); } }),
-  slider($('domainRows'), { label: 'height', min: 0.5, max: 40, step: 0.001, get: () => state.height, set: (v) => { state.height = Math.max(0.05, v); } }),
+  slider($('domainRows'), { label: '<i>x</i><sub>0</sub>', title: 'Centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[0], set: (v) => { state.z0[0] = v; } }),
+  slider($('domainRows'), { label: '<i>y</i><sub>0</sub>', title: 'Centre of the domain', min: -20, max: 20, step: 0.001, get: () => state.z0[1], set: (v) => { state.z0[1] = v; } }),
+  slider($('domainRows'), { label: 'Width', min: 0.5, max: 40, step: 0.001, get: () => state.width, set: (v) => { state.width = Math.max(0.05, v); } }),
+  slider($('domainRows'), { label: 'Height', min: 0.5, max: 40, step: 0.001, get: () => state.height, set: (v) => { state.height = Math.max(0.05, v); } }),
 ];
-const phiSlider = slider($('phiRow'), { label: 'angle', title: 'angle of the grid in the z-plane', min: -PI, max: PI, step: 0.001, unit: PI, suffix: 'π', get: () => state.phi, set: (v) => { state.phi = v; } });
+const phiSlider = slider($('phiRow'), { label: 'Angle', title: 'Angle of the grid in the z-plane', min: -PI, max: PI, step: 0.001, unit: PI, suffix: 'π', get: () => state.phi, set: (v) => { state.phi = v; } });
 const appearanceSliders = [
   slider($('appearanceRows'), {
-    label: 'line spacing', min: 0.02, max: 2, step: 0.001, get: () => state.gridStep,
+    label: 'Line spacing', min: 0.02, max: 2, step: 0.001, get: () => state.gridStep,
     set: (v) => { state.gridStep = Math.max(0.005, v); viewer.setStyle({ gridStep: state.gridStep }); },
     recompute: false,
   }),
   slider($('appearanceRows'), {
-    label: 'line width', min: 0.2, max: 2.5, step: 0.01, digits: 2, get: () => state.lineW,
+    label: 'Line width', min: 0.2, max: 2.5, step: 0.01, digits: 2, get: () => state.lineW,
     set: (v) => { state.lineW = v; viewer.setStyle({ lineWidth: v }); },
     recompute: false,
   }),
@@ -788,7 +773,6 @@ const whithamSlider = slider($('whithamRow'), {
   enter: whithamEnter,
   snap: criticalS,
   play: { key: 'whitham' },
-  reset: { title: 'recentre: make the current spectral curve the centre of the slider', onClick: () => { whithamRecentre(); requestFamily(); } },
 });
 $('showFamily').addEventListener('change', showFamily);
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
@@ -798,10 +782,10 @@ $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whith
 $('closeBtn').addEventListener('click', () => {
   const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
   const info = $('closeInfo');
-  info.textContent = 'searching for periods…';
+  info.textContent = 'Searching for periods…';
   $('closeBtn').disabled = true;
   const done = () => { w.terminate(); $('closeBtn').disabled = false; };
-  w.onerror = (e) => { info.textContent = `error: ${e.message}`; done(); };
+  w.onerror = (e) => { info.textContent = `Error: ${e.message}`; done(); };
   w.onmessage = (e) => {
     done();
     if (e.data.error) { info.textContent = e.data.error; return; }
@@ -902,7 +886,7 @@ $('playLam').addEventListener('click', () => toggleAnim({ key: 'theta0' }, $('pl
 // ------------------------------------------------------------------ presets and export
 
 const presetSel = $('preset');
-presetSel.innerHTML = '<option value="">choose a preset…</option>' +
+presetSel.innerHTML = '<option value="">Choose a preset…</option>' +
   PRESETS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
 presetSel.addEventListener('change', () => {
   const p = PRESETS[+presetSel.value];
@@ -943,11 +927,11 @@ $('linkBtn').addEventListener('click', async () => {
   writeHash();
   try {
     await navigator.clipboard.writeText(location.href);
-    $('linkBtn').textContent = 'copied';
+    $('linkBtn').textContent = 'Copied';
   } catch {
-    $('linkBtn').textContent = 'see address bar';
+    $('linkBtn').textContent = 'See address bar';
   }
-  setTimeout(() => { $('linkBtn').textContent = 'copy link'; }, 1500);
+  setTimeout(() => { $('linkBtn').textContent = 'Copy link'; }, 1500);
 });
 function download(href, name) {
   const a = document.createElement('a');

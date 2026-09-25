@@ -1,7 +1,6 @@
 // Interactive editor for the spectral data in the lambda-plane.
 //
-//  - branch points alpha_i: filled dots, draggable within the punctured unit disc; the selected one
-//    carries a ring (clicking or dragging a point selects it)
+//  - branch points alpha_i: filled dots, draggable within the punctured unit disc
 //  - Sym point lam0 = e^{i theta0}: a rust dot, draggable along the unit circle; it snaps onto
 //  - common roots on S^1 of the differentials Theta_w: small rust diamonds
 //  - reflections 1/conj(alpha_i): faint rings (read-only)
@@ -20,13 +19,11 @@ const R_MIN = 0.03, R_MAX = 0.97;
 export const MAX_GENUS = 8;
 
 export class SpectralWidget {
-  /** onChange(state, dragging) with state = { alphas, theta0 }; onSelect(i) when a branch point is picked */
-  constructor(canvas, onChange, onSelect = () => {}) {
+  /** onChange(state, dragging) with state = { alphas, theta0 } */
+  constructor(canvas, onChange) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.onChange = onChange;
-    this.onSelect = onSelect;
-    this.selected = -1;
     this.alphas = [];
     this.theta0 = 0;
     this.divisor = [];
@@ -48,7 +45,6 @@ export class SpectralWidget {
     if (divisor) this.divisor = divisor;
     if ('family' in opts) this.family = opts.family;
     if ('commonRoots' in opts) this.commonRoots = opts.commonRoots || [];
-    if ('selected' in opts) this.selected = opts.selected;
     this.draw();
   }
 
@@ -103,7 +99,6 @@ export class SpectralWidget {
         this.drag = { kind: 'rotate', ang: Math.atan2(z[1], z[0]) };
       } else if (hit) {
         this.drag = hit;
-        if (hit.kind === 'alpha' && hit.i !== this.selected) { this.selected = hit.i; this.onSelect(hit.i); this.draw(); }
       } else {
         return;
       }
@@ -158,8 +153,6 @@ export class SpectralWidget {
       const hit = this._pick(x, y);
       if (hit && hit.kind === 'alpha') {
         this.alphas.splice(hit.i, 1);
-        this.selected = Math.min(hit.i, this.alphas.length - 1);
-        this.onSelect(this.selected);
       } else if (!hit) {
         const z = this._fromPx(x, y);
         const r = Math.hypot(z[0], z[1]);
@@ -167,8 +160,6 @@ export class SpectralWidget {
         const rr = Math.min(R_MAX, Math.max(R_MIN, r));
         const t = Math.atan2(z[1], z[0]);
         this.alphas.push([rr * Math.cos(t), rr * Math.sin(t)]);
-        this.selected = this.alphas.length - 1;
-        this.onSelect(this.selected);
       } else {
         return;
       }
@@ -281,8 +272,8 @@ export class SpectralWidget {
         ctx.fillText(txt, 0, -5);
         ctx.restore();
       };
-      lab(0.62, 'nodoids');
-      lab(-0.62, 'unduloids');
+      lab(0.62, 'Nodoids');
+      lab(-0.62, 'Unduloids');
       ctx.restore();
     }
 
@@ -332,22 +323,17 @@ export class SpectralWidget {
 
     this._drawFamily(ctx, ink);
 
-    // branch points, the selected one ringed
+    // branch points
     const lp = this._toPx([Math.cos(this.theta0), Math.sin(this.theta0)]);
     const pts = this.alphas.map((a) => this._toPx(a));
     pts.forEach((p, i) => {
       const hot = this.hover === `alpha${i}` || (this.drag && this.drag.i === i);
       ctx.fillStyle = ink;
       ctx.beginPath(); ctx.arc(p[0], p[1], hot ? 6 : 5, 0, 2 * Math.PI); ctx.fill();
-      if (i === this.selected) {
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 2 * Math.PI); ctx.stroke();
-      }
     });
     pts.forEach((p, i) => {
       const others = [...pts.filter((_, j) => j !== i), lp];
-      this._label(ctx, 'α', String(i + 1), p, this._labelDir(p, i, others), ink, i === this.selected ? 12 : 9);
+      this._label(ctx, 'α', String(i + 1), p, this._labelDir(p, i, others), ink, 9);
     });
 
     // Sym point, labelled outside the circle

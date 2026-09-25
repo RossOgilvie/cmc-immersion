@@ -45,6 +45,7 @@
   .sub { font-style: italic; font-size: 15px; color: var(--muted); margin: 2px 0 0; }
   .note { font-style: italic; font-size: 15.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.35; }
   .muted { color: var(--muted); }
+  .note:empty { display: none; }
   .hide { display: none !important; }
   [hidden] { display: none !important; }
 
@@ -160,17 +161,13 @@
   #lam { width: 100%; aspect-ratio: 1; display: block; touch-action: none; margin: 4px 0 2px; }
   .bprow { display: grid; align-items: center; column-gap: 4px; }
   .lamrow .sym { font-size: 18px; color: var(--accent); }
-  .lamrow:hover { background: none; }
   .lab { color: var(--muted); font-style: italic; text-align: right; }
   .bphead { height: 30px; margin-top: 2px; }
   .bphead i { font-style: italic; }
   .bprow {
     grid-template-columns: 34px 14px 56px 30px 56px 16px 1fr; height: 36px; padding-left: 4px; border-radius: 3px;
   }
-  .bprow:hover { background: var(--shade); }
-  .bprow.sel { background: var(--shade); }
-  .bprow .disc { font-size: 18px; display: inline-block; }
-  .bprow.sel .disc { color: var(--accent); }
+  .bprow .name { font-size: 18px; }
   .bprow .gly { justify-self: end; }
   sub { font-size: 0.68em; line-height: 0; }
 
@@ -197,7 +194,7 @@
   <canvas id="view"></canvas>
   <div id="status"></div>
   <div id="busy"></div>
-  <div id="keys">drag: rotate · shift-drag: roll · wheel / ±: zoom · WASD QE: move · F: frame · R: reset</div>
+  <div id="keys">Drag: rotate · shift-drag: roll · wheel / ±: zoom · WASD QE: move · F: frame · R: reset</div>
 </div>
 
 <aside id="panel">
@@ -213,18 +210,18 @@
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodySpec"><span class="chev" data-glyph="chev"></span>Spectral data</button></h2>
     <div class="secbody" id="bodySpec">
       <div class="specbar">
-        <button class="disc" type="button" aria-expanded="false" aria-controls="helpText"><span class="chev" data-glyph="chev"></span>how to use</button>
-        <span class="genus">genus
-          <button class="gly" id="remAlpha" type="button" data-glyph="minus" aria-label="Decrease genus (removes the selected branch point)" title="remove the selected branch point"></button>
+        <button class="disc" type="button" aria-expanded="false" aria-controls="helpText"><span class="chev" data-glyph="chev"></span>How to use</button>
+        <span class="genus">Genus
+          <button class="gly" id="remAlpha" type="button" data-glyph="minus" aria-label="Decrease genus (removes the last branch point)" title="Remove the last branch point"></button>
           <span id="genus"></span>
-          <button class="gly" id="addAlpha" type="button" data-glyph="plus" aria-label="Increase genus (adds a branch point)" title="add a branch point"></button>
+          <button class="gly" id="addAlpha" type="button" data-glyph="plus" aria-label="Increase genus (adds a branch point)" title="Add a branch point"></button>
         </span>
       </div>
       <div class="help" id="helpText" hidden>
-        <p>Drag the branch points α (black dots) and the Sym point λ₀ (rust dot); click a branch point to select it. A small rust diamond on the circle marks a common root of the differentials Θ, where λ₀ closes up translationally in every direction; λ₀ snaps onto it. Shift-drag turns everything together. Double-click to add or remove a branch point. The grey rings mark the eigenline divisor at the centre of the domain.</p>
+        <p>Drag the branch points α (black dots) and the Sym point λ₀ (rust dot). A small rust diamond on the circle marks a common root of the differentials Θ, where λ₀ closes up translationally in every direction; λ₀ snaps onto it. Shift-drag turns everything together. Double-click to add or remove a branch point. The grey rings mark the eigenline divisor at the centre of the domain.</p>
       </div>
       <canvas id="lam"></canvas>
-      <button class="disc bphead" type="button" aria-expanded="false" aria-controls="bpList"><span class="chev" data-glyph="chev"></span><i>branch points and Sym point</i></button>
+      <button class="disc bphead" type="button" aria-expanded="false" aria-controls="bpList"><span class="chev" data-glyph="chev"></span><i>Branch points and Sym point</i></button>
       <div id="bpList" hidden>
         <div id="alphaList"></div>
         <div class="bprow lamrow">
@@ -233,7 +230,7 @@
           <label class="lab" for="theta0">arg</label>
           <input class="num" id="theta0" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of λ0 in units of π">
           <span class="muted">π</span>
-          <button class="gly" id="playLam" type="button" data-glyph="play" aria-label="Sweep λ0 around the circle" title="sweep λ₀ around the circle (associated family)"></button>
+          <button class="gly" id="playLam" type="button" data-glyph="play" aria-label="Sweep λ0 around the circle" title="Sweep λ₀ around the circle (associated family)"></button>
         </div>
       </div>
     </div>
@@ -243,8 +240,8 @@
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="whithamBox"><span class="chev" data-glyph="chev"></span>Whitham deformation</button></h2>
     <div class="secbody" id="whithamBox">
       <div id="whithamRow"></div>
-      <label class="cb"><input type="checkbox" class="chk" id="whithamDomain" checked><span>carry the domain along</span></label>
-      <label class="cb"><input type="checkbox" class="chk" id="showFamily" checked><span>show the family in the λ-plane</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="whithamDomain" checked><span>Carry the domain along</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="showFamily" checked><span>Show the family in the λ-plane</span></label>
       <p class="note" id="whithamNote"></p>
     </div>
   </section>
@@ -261,11 +258,11 @@
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyDomain"><span class="chev" data-glyph="chev"></span>Domain in the z-plane</button></h2>
     <div class="secbody" id="bodyDomain">
       <div id="domainRows"></div>
-      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>align grid with curvature lines</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>Align grid with curvature lines</span></label>
       <div id="phiRow"></div>
       <div class="btnrow">
-        <button class="tbtn" id="closeBtn" type="button" title="find the periods along the grid directions and trim the domain to one closed piece">close up</button>
-        <button class="tbtn" id="domainReset" type="button" title="back to the domain of the last preset, link or close-up">reset domain</button>
+        <button class="tbtn" id="closeBtn" type="button" title="Find the periods along the grid directions and trim the domain to one closed piece">Close up</button>
+        <button class="tbtn" id="domainReset" type="button" title="Back to the domain of the last preset, link or close-up">Reset domain</button>
       </div>
       <span class="note" id="closeInfo"></span>
     </div>
@@ -274,31 +271,31 @@
   <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyLook"><span class="chev" data-glyph="chev"></span>Appearance</button></h2>
     <div class="secbody" id="bodyLook">
-      <div class="frow"><label for="colour">colour</label>
+      <div class="frow"><label for="colour">Colour</label>
         <select id="colour">
-          <option value="side">two-sided</option>
-          <option value="u">conformal factor u</option>
+          <option value="side">Two-sided</option>
+          <option value="u">Conformal factor u</option>
           <option value="K">Gauss curvature K</option>
         </select></div>
-      <label class="cb"><input type="checkbox" class="chk" id="grid" checked><span>draw parameter lines</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="grid" checked><span>Draw parameter lines</span></label>
       <div id="appearanceRows"></div>
-      <div class="frow"><span>colours</span>
+      <div class="frow"><span>Colours</span>
         <span class="swatches">
-          <input type="color" id="front" title="the side N points to (mean-convex side)" aria-label="Front colour" value="#6f8fb0">
-          <input type="color" id="back" title="the other side" aria-label="Back colour" value="#e8c9a0">
-          <input type="color" id="bg" title="background" aria-label="Background colour" value="#f2eee3">
+          <input type="color" id="front" title="The side N points to (mean-convex side)" aria-label="Front colour" value="#6f8fb0">
+          <input type="color" id="back" title="The other side" aria-label="Back colour" value="#e8c9a0">
+          <input type="color" id="bg" title="Background" aria-label="Background colour" value="#f2eee3">
         </span></div>
-      <div class="frow"><label for="res">resolution</label>
+      <div class="frow"><label for="res">Resolution</label>
         <select id="res">
           <option value="96">96</option><option value="160">160</option>
           <option value="240" selected>240</option><option value="360">360</option><option value="512">512</option>
         </select></div>
-      <label class="cb"><input type="checkbox" class="chk" id="adapt" checked><span>adapt the mesh to the metric</span></label>
-      <div class="frow"><label for="acc">accuracy</label>
+      <label class="cb"><input type="checkbox" class="chk" id="adapt" checked><span>Adapt the mesh to the metric</span></label>
+      <div class="frow"><label for="acc">Accuracy</label>
         <select id="acc">
-          <option value="0.1">fast (h ≤ 0.1)</option>
-          <option value="0.05" selected>normal (h ≤ 0.05)</option>
-          <option value="0.02">high (h ≤ 0.02)</option>
+          <option value="0.1">Fast (h ≤ 0.1)</option>
+          <option value="0.05" selected>Normal (h ≤ 0.05)</option>
+          <option value="0.02">High (h ≤ 0.02)</option>
         </select></div>
     </div>
   </section>
@@ -306,13 +303,13 @@
   <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyPresets"><span class="chev" data-glyph="chev"></span>Presets &amp; export</button></h2>
     <div class="secbody" id="bodyPresets">
-      <div class="frow"><label for="preset">preset</label><select id="preset"></select></div>
+      <div class="frow"><label for="preset">Preset</label><select id="preset"></select></div>
       <div class="btnrow">
-        <button class="tbtn" id="viewReset" type="button" title="reset the rotation and frame the surface (R)">reset view</button>
-        <button class="tbtn" id="frameBtn" type="button" title="frame the surface (F)">frame</button>
-        <button class="tbtn" id="pngBtn" type="button" title="save a screenshot">PNG</button>
-        <button class="tbtn" id="objBtn" type="button" title="save the mesh">OBJ</button>
-        <button class="tbtn" id="linkBtn" type="button">copy link</button>
+        <button class="tbtn" id="viewReset" type="button" title="Reset the rotation and frame the surface (R)">Reset view</button>
+        <button class="tbtn" id="frameBtn" type="button" title="Frame the surface (F)">Frame</button>
+        <button class="tbtn" id="pngBtn" type="button" title="Save a screenshot">PNG</button>
+        <button class="tbtn" id="objBtn" type="button" title="Save the mesh">OBJ</button>
+        <button class="tbtn" id="linkBtn" type="button">Copy link</button>
       </div>
     </div>
   </section>
