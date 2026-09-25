@@ -8,8 +8,8 @@
 //    denominators; where two cross, the data close up into a torus, and a dragged target snaps onto such
 //    a crossing (hold alt to avoid). The diagonal phi_1 = phi_2 (dashed) is the Wente family; the flow
 //    fills the triangle phi_1 + phi_2 < pi (CKKS), so the far half of the square is shaded.
-//  - 'free' (genus >= 4): the image of phi is not known. The window is centred on the anchor and zooms
-//    with the wheel (and widens by itself when the point nears its edge); a faint trail shows where the
+//  - 'free' (genus >= 4): the image of phi is not known. The window is centred on the anchor, zooms with
+//    the wheel, pans with shift-drag, and widens by itself when the point nears its edge; a faint trail shows where the
 //    flow has been and small crosses where it stopped, which maps out the reachable region.
 
 const Q_MAX = 6; // denominators of the grid lines and snap points
@@ -96,6 +96,13 @@ export class SymPad {
     };
     c.addEventListener('pointerdown', (e) => {
       if (!this.phi) return;
+      // free mode: shift-drag pans the window
+      if (this.mode === 'free' && e.shiftKey) {
+        this.pan = { at: pos(e), view: this.view.slice() };
+        c.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
       this.drag = true;
       c.setPointerCapture(e.pointerId);
       e.preventDefault();
@@ -103,10 +110,19 @@ export class SymPad {
     });
     c.addEventListener('pointermove', (e) => {
       if (!this.phi) { c.style.cursor = 'default'; return; }
-      c.style.cursor = this.drag ? 'grabbing' : 'crosshair';
+      if (this.pan) {
+        const [x, y] = pos(e), { s } = this._geom(), [a, b, cc, d] = this.pan.view;
+        const dx = ((x - this.pan.at[0]) / s) * (b - a), dy = ((y - this.pan.at[1]) / s) * (d - cc);
+        this.view = [a - dx, b - dx, cc + dy, d + dy];
+        c.style.cursor = 'move';
+        this.draw();
+        return;
+      }
+      c.style.cursor = this.drag ? 'grabbing' : this.mode === 'free' && e.shiftKey ? 'move' : 'crosshair';
       if (this.drag) emit(e, true);
     });
     const up = (e) => {
+      if (this.pan) { this.pan = null; return; }
       if (!this.drag) return;
       this.drag = false;
       emit(e, false);
