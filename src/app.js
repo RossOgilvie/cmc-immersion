@@ -117,7 +117,8 @@ function linkURL() {
   if (state.colour !== 'side') p.set('m', state.colour);
   if (state.transp) p.set('o', fmt(state.transp, 2));
   p.set('g', fmt(state.gridStep));
-  if (state.H !== 0.5) p.set('H', fmt(state.H));
+  if ($('autoH').checked) p.set('H', 'auto');
+  else if (state.H !== 0.5) p.set('H', fmt(state.H));
   if (state.adaptive) p.set('h', 'a');
   else if (state.hmax !== 0.05) p.set('h', fmt(state.hmax));
   if (state.res !== 240) p.set('r', state.res);
@@ -151,6 +152,8 @@ function readHash() {
     state.transp = Math.min(1, Math.max(0, +p.get('o') || 0));
     if (p.has('g')) state.gridStep = +p.get('g') || state.gridStep;
     if (p.has('H')) state.H = Math.max(0.01, +p.get('H') || 0.5);
+    $('autoH').checked = p.get('H') === 'auto';
+    autoH.d = null;
     state.adaptive = p.get('h') === 'a';
     if (p.has('h')) state.hmax = state.adaptive ? 0.05 : +p.get('h') || 0.05;
     if (p.has('r')) state.res = Math.min(1024, Math.max(16, +p.get('r') || 240));
@@ -274,6 +277,7 @@ function onResult(e) {
 
 /** Called after every state change. dragging: more changes are coming, so only preview. */
 function changed(dragging = false) {
+  applyAutoH();
   whithamCheckAnchor();
   whithamSlider.refresh();
   requestFamily();
@@ -599,15 +603,44 @@ function textureStyle(range) {
   transpSlider.row.classList.toggle('hide', wire);
   return { mode: { side: 0, u: 1, K: 2 }[state.colour] ?? 0, range, wire, grid: wire || state.grid, opacity: 1 - state.transp };
 }
+function setH(v) {
+  state.H = Math.max(0.01, v);
+  viewer.setScale(1 / (2 * state.H));
+  recolour();
+  if (last) show(last);
+}
 const Hslider = slider($('Hrow'), {
-  label: '<i>H</i>', min: 0.05, max: 3, step: 0.01, digits: 2, get: () => state.H,
-  set: (v) => {
-    state.H = Math.max(0.01, v);
-    viewer.setScale(1 / (2 * state.H));
-    recolour();
-    if (last) show(last);
-  },
-  recompute: false,
+  label: '<i>H</i>', min: 0.05, max: 3, step: 0.01, digits: 2, get: () => state.H, set: setH, recompute: false,
+});
+
+// Automatic H = 1 / min |alpha_j - lam0| (for the soul conjecture: as branch points come to the Sym point
+// the surface tends to a cylinder, and with H scaled up the cylinder thins towards a space curve). The
+// homothety by 1/(2H) shrinks the surface; enlarging the domain by the same factor keeps its length.
+const autoH = { d: null }; // the distance at the last update
+function nearestBranchDistance() {
+  const [c, s] = [Math.cos(state.theta0), Math.sin(state.theta0)];
+  return state.alphas.length ? Math.min(...state.alphas.map(([re, im]) => Math.hypot(re - c, im - s))) : null;
+}
+function applyAutoH() {
+  const on = $('autoH').checked;
+  Hslider.row.querySelectorAll('input, button').forEach((el) => { el.disabled = on; });
+  $('autoHDomain').disabled = !on;
+  const d = on ? nearestBranchDistance() : null;
+  $('HNote').innerHTML = on ? (d ? `min |α − λ<sub>0</sub>| = ${fixed(d, 4)}` : 'Needs a branch point.') : '';
+  if (!d) { autoH.d = null; return; }
+  if ($('autoHDomain').checked && autoH.d) {
+    const f = autoH.d / d;
+    state.width *= f; state.height *= f; state.z0 = state.z0.map((v) => v * f);
+    for (const sl of domainSliders) sl.refresh();
+  }
+  autoH.d = d;
+  if (Math.abs(state.H - 1 / d) > 1e-12) setH(1 / d);
+  Hslider.refresh();
+}
+$('autoH').addEventListener('change', () => {
+  autoH.d = null;
+  applyAutoH();
+  changed(false);
 });
 
 // ------------------------------------------------------------------ common roots of the differentials on S^1
@@ -1133,6 +1166,7 @@ function download(href, name) {
 // ------------------------------------------------------------------ start
 
 function refreshAll() {
+  autoH.d = null; // a preset or link brings its own domain: the automatic H doesn't rescale it
   buildAlphaList();
   buildTau();
   widget.set({ alphas: state.alphas, theta0: state.theta0, divisor: [] });

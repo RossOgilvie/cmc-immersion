@@ -144,7 +144,9 @@ Open:
 - Blow-up view of the α → 0 corner (Carberry–Klein–Schmidt, arXiv:2110.01574): zoom into one bubble
   and rescale z and f, once the normalisation is settled.
 - Bubbleton presets: the 𝒲 tag shows NaN at a double branch point (show "–" and disable the slider).
-- **Soul conjecture.** Rescale the mean curvature automatically by a function of the distance from the
+- **Soul conjecture.** First version done: "Set H = 1 / min |alpha - lam0|" in the Mean curvature section,
+  with the domain enlarged by the same factor. Open: other scalings, and more mesh resolution as the
+  domain grows. Original note: rescale the mean curvature automatically by a function of the distance from the
   branch points to lam0. Hypothesis: as one or more alpha -> lam0 the surface degenerates to a cylinder,
   but with H scaled correctly the cylinder's width shrinks and the limit is an interesting space curve.
 - **Soul conjecture II.** The same in a coordinate kappa adapted to the Sym point (from our preliminary

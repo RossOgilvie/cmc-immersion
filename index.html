@@ -207,7 +207,12 @@
 
   <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="bodyH"><span class="chev" data-glyph="chev"></span>Mean curvature</button></h2>
-    <div class="secbody" id="bodyH"><div id="Hrow"></div></div>
+    <div class="secbody" id="bodyH">
+      <div id="Hrow"></div>
+      <label class="cb"><input type="checkbox" class="chk" id="autoH"><span>Set <i>H</i> = 1 / min |α − λ<sub>0</sub>|</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="autoHDomain" checked><span>Enlarge the domain with it</span></label>
+      <p class="note" id="HNote"></p>
+    </div>
   </section>
 
   <section class="sec">
