@@ -121,6 +121,16 @@
     <p class="small" id="tauNote"></p>
   </fieldset>
 
+  <fieldset id="whithamBox">
+    <legend>Whitham deformation</legend>
+    <div id="whithamRow"></div>
+    <div class="btnrow">
+      <button id="whithamReset" type="button" title="make the current spectral curve the centre of the slider">recentre here</button>
+      <label class="cb" style="margin:0"><input type="checkbox" id="whithamDomain" checked> carry the domain along</label>
+    </div>
+    <p class="small" id="whithamNote"></p>
+  </fieldset>
+
   <fieldset>
     <legend>Domain in the z-plane</legend>
     <div id="domainRows"></div>
@@ -128,6 +138,7 @@
     <div id="phiRow"></div>
     <div class="btnrow">
       <button id="closeBtn" type="button" title="find the periods along the grid directions and trim the domain to one closed piece">close up</button>
+      <button id="domainReset" type="button" title="back to the domain of the last preset, link or close-up">reset domain</button>
       <span class="small" id="closeInfo"></span>
     </div>
   </fieldset>
@@ -165,6 +176,7 @@
     <legend>Presets &amp; export</legend>
     <div class="row"><select id="preset"></select></div>
     <div class="btnrow">
+      <button id="viewReset" type="button" title="reset the rotation and frame the surface (R)">reset view</button>
       <button id="frameBtn" type="button">frame</button>
       <button id="pngBtn" type="button">PNG</button>
       <button id="objBtn" type="button">OBJ</button>
@@ -177,6 +189,7 @@
     <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion with H = ½ and metric 4e²ᵘ|dz|²; the H slider rescales it by 1/(2H).</p>
     <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
     <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
+    <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
     <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>.</p>
   </details>
 </aside>

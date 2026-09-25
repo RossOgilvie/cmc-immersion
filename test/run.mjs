@@ -7,6 +7,7 @@ import {
   computeSurface, hopfArg, closingInfo,
 } from '../src/cmc/cmc.js';
 import { periodVector, periodLattice } from '../src/cmc/periods.js';
+import { WhithamCurve } from '../src/cmc/whitham.js';
 
 let failures = 0;
 function check(name, value, tol) {
@@ -185,6 +186,38 @@ console.log('periods of Theta_w and closing conditions:');
   const r2 = (2 - Math.sqrt(3)) ** 2;
   const c = closingInfo({ alphas: [[r2, 0], [r2, 0]], theta0: 0, hmax: 0.002 }, 's');
   check('two-lobed bubbleton closes after one period pi', c && c.q === 1 ? Math.abs(c.T - Math.PI) : Infinity, 1e-5);
+}
+
+// ------------------------------------------------------------------ Whitham deformation
+console.log('Whitham deformation keeps the period lattice up to Gamma(0)/z:');
+for (const [name, al] of [
+  ['Wente', [[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]]],
+  ['generic g=2', [[0.4, 0.25], [-0.3, 0.5]]],
+]) {
+  const C = new WhithamCurve(al);
+  const L0 = periodLattice(al).generators;
+  const cov = (L) => { // lattice invariants: |w1|, |w2|, |w1 x w2|, up to the choice of generators
+    const [a, b] = L;
+    return [Math.hypot(...a), Math.hypot(...b), Math.abs(a[0] * b[1] - a[1] * b[0])];
+  };
+  let worst = 0, ok = true;
+  for (const s of [-0.1, 0.1, 0.25]) {
+    const r = C.at(s);
+    if (Math.abs(r.s - s) > 1e-3) { ok = false; continue; } // s is the arclength actually travelled
+    // Gamma(s) z = Gamma(0): compare the invariants of Gamma(s) scaled by |z| (and |z|^2 for the area)
+    const L = periodLattice(r.alphas).generators;
+    if (L.length < 2 || L0.length < 2) { ok = false; continue; }
+    const m = Math.hypot(...r.z);
+    const [a, b, A] = cov(L), [a0, b0, A0] = cov(L0);
+    worst = Math.max(worst, Math.abs(a * m - a0) / a0, Math.abs(b * m - b0) / b0, Math.abs(A * m * m - A0) / A0);
+  }
+  check(`${name}: lattice of the deformed curve = Gamma(0)/z`, ok ? worst : Infinity, 1e-6);
+}
+{
+  // genus 3 (generally no lattice): the curve continues and keeps [ell] in CP^2 fixed
+  const C = new WhithamCurve([[0.4, 0.25], [-0.3, 0.5], [0.1, -0.6]]);
+  const r = C.at(0.2), q = C.at(-0.2);
+  check('g=3: Whitham curve continues to s = ±0.2', Math.max(Math.abs(r.s - 0.2), Math.abs(q.s + 0.2)), 1e-3);
 }
 
 // ------------------------------------------------------------------ timing

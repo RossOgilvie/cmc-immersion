@@ -115,6 +115,7 @@ test/
 
 - General torus search (closing conditions in the UI), and a "close up" that uses the lattice Γ rather
   than the grid axes (so non-rectangular fundamental domains work).
-- Whitham deformations preserving the period plane and its conformal type.
+- Whitham: done as a slider (continuation keeping [ell] in CP^{g-1} and arg a(0) fixed). Open: use the
+  Willmore functional as the flow parameter, and follow the common root of B_a as a moving Sym point.
 - The $S^3$ version (two Sym points), and a pen-and-ink hatching style like the example page.
 - Direct dragging of divisor points (this needs an inverse map from divisor to $\tau$).

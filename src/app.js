@@ -3,6 +3,7 @@
 import { Viewer } from './viewer.js';
 import { SpectralWidget, MAX_GENUS } from './spectral-widget.js';
 import { shapeFlows, kappa0, hopfArg } from './cmc/cmc.js';
+import { WhithamCurve } from './cmc/whitham.js';
 
 const $ = (id) => document.getElementById(id);
 const polar = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
@@ -198,6 +199,7 @@ function onResult(e) {
 
 /** Called after every state change. dragging: more changes are coming, so only preview. */
 function changed(dragging = false) {
+  whithamCheckAnchor();
   request(false);
   clearTimeout(fullTimer);
   fullTimer = setTimeout(() => request(true), dragging || anim ? 350 : 0);
@@ -262,6 +264,7 @@ const widget = new SpectralWidget($('lam'), (s, dragging) => {
 });
 
 function genusChanged() {
+  whithamRecentre();
   syncTau();
   needFrame = true;
   buildAlphaList();
@@ -349,12 +352,12 @@ function slider(parent, { label, min, max, step, get, set, digits = 3, play, rec
     rng.value = v;
     if (document.activeElement !== num) num.value = fmt(v, digits);
   };
-  rng.addEventListener('input', () => { set(+rng.value); num.value = fmt(+rng.value, digits); after(true); });
+  rng.addEventListener('input', () => { set(+rng.value); refresh(); after(true); });
   num.addEventListener('change', () => {
     const v = +num.value;
     if (!Number.isFinite(v)) return;
     set(v);
-    rng.value = v;
+    refresh();
     after(false);
   });
   if (play) {
@@ -433,6 +436,81 @@ const Hslider = slider($('Hrow'), {
   recompute: false,
 });
 
+// ------------------------------------------------------------------ Whitham deformation
+
+// curve: the Whitham curve through the anchor (created lazily); key: the alphas it last produced, so
+// that any other edit of the spectral data re-anchors; base: the domain at s = 0.
+const whitham = { curve: null, s: 0, key: null, base: null, z: [1, 0], applied: null };
+const domainKey = () => JSON.stringify([state.z0, state.width, state.height]);
+
+function whithamCheckAnchor() {
+  if (whitham.key !== null && whitham.key !== JSON.stringify(state.alphas)) whithamRecentre();
+}
+function whithamRecentre() {
+  whitham.curve = null;
+  whitham.s = 0;
+  whitham.key = null;
+  whitham.z = [1, 0];
+  whithamSlider.refresh();
+  whithamNote();
+}
+function whithamNote() {
+  const g = genus();
+  $('whithamBox').querySelectorAll('input, button').forEach((el) => { el.disabled = g < 2; });
+  if (g < 2) { $('whithamNote').textContent = 'Needs genus ≥ 2.'; return; }
+  const zr = Math.hypot(...whitham.z), za = Math.atan2(whitham.z[1], whitham.z[0]);
+  $('whithamNote').textContent = whitham.s === 0 && !whitham.curve
+    ? 'Moves the branch points keeping the conformal type of the period lattice.'
+    : `lattice scaled by 1/|z| = ${fmt(1 / zr, 4)}` + (Math.abs(za) > 1e-6 ? `, turned by ${fmt(-za, 4)}` : '');
+}
+function whithamMove(s) {
+  if (genus() < 2) return s;
+  if (!whitham.curve) {
+    try {
+      whitham.curve = new WhithamCurve(state.alphas);
+    } catch (e) {
+      $('whithamNote').textContent = String(e.message || e);
+      return 0;
+    }
+    whitham.base = { z0: state.z0.slice(), width: state.width, height: state.height };
+    whitham.applied = domainKey();
+  }
+  // a domain edited by hand since the last move becomes the new base (pulled back to s = 0)
+  if (whitham.applied !== domainKey()) {
+    const [zr, zi] = whitham.z, m = Math.hypot(zr, zi);
+    whitham.base = {
+      z0: [state.z0[0] * zr - state.z0[1] * zi, state.z0[0] * zi + state.z0[1] * zr],
+      width: state.width * m, height: state.height * m,
+    };
+  }
+  const r = whitham.curve.at(s);
+  state.alphas = r.alphas;
+  whitham.s = r.s;
+  whitham.z = r.z;
+  whitham.key = JSON.stringify(state.alphas);
+  if ($('whithamDomain').checked) {
+    // Gamma(s) = Gamma(0) / z
+    const [zr, zi] = r.z, d = zr * zr + zi * zi, m = Math.sqrt(d);
+    const b = whitham.base;
+    state.z0 = [(b.z0[0] * zr + b.z0[1] * zi) / d, (b.z0[1] * zr - b.z0[0] * zi) / d];
+    state.width = b.width / m;
+    state.height = b.height / m;
+    for (const sl of domainSliders) sl.refresh();
+  }
+  whitham.applied = domainKey();
+  widget.set({ alphas: state.alphas });
+  refreshAlphaValues();
+  whithamNote();
+  return r.s;
+}
+const whithamSlider = slider($('whithamRow'), {
+  label: 'Whitham s', min: -0.5, max: 0.5, step: 0.002, get: () => whitham.s,
+  set: (v) => { whithamMove(v); },
+  play: { key: 'whitham' },
+});
+$('whithamReset').addEventListener('click', () => { whithamRecentre(); });
+$('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
+
 // ------------------------------------------------------------------ closing up
 
 $('closeBtn').addEventListener('click', () => {
@@ -462,6 +540,7 @@ $('closeBtn').addEventListener('click', () => {
     info.textContent = parts.join(' · ');
     if (changedAny) {
       for (const s of domainSliders) s.refresh();
+      saveHomeDomain();
       needFrame = true;
       changed(false);
     }
@@ -517,6 +596,14 @@ function animStep(now) {
     state.theta0 = wrapPi(state.theta0 + 0.3 * dt);
     widget.set({ theta0: state.theta0 });
     refreshAlphaValues();
+  } else if (anim.key === 'whitham') {
+    if (!busy) {
+      anim.dir = anim.dir || 1;
+      const want = whitham.s + anim.dir * 0.05 * dt;
+      const got = whithamMove(Math.max(-0.5, Math.min(0.5, want)));
+      if (Math.abs(got - want) > 1e-9 || Math.abs(got) >= 0.5) anim.dir = -anim.dir;
+      whithamSlider.refresh();
+    }
   } else {
     let v = state.tau[anim.i] + 0.4 * dt;
     if (v > 2 * PI) v -= 4 * PI;
@@ -541,6 +628,7 @@ presetSel.addEventListener('change', () => {
   Object.assign(state, structuredClone(VIEW_DEFAULTS), structuredClone(p.s));
   syncTau();
   refreshAll();
+  saveHomeDomain();
   viewer.resetOrientation();
   needFrame = true;
   changed(false);
@@ -548,6 +636,20 @@ presetSel.addEventListener('change', () => {
 });
 
 $('frameBtn').addEventListener('click', () => viewer.frame());
+$('viewReset').addEventListener('click', () => { viewer.resetOrientation(); viewer.frame(); });
+
+// 'reset domain' returns to the domain of the last preset, link or close-up
+let homeDomain = null;
+const saveHomeDomain = () => { homeDomain = structuredClone({ z0: state.z0, width: state.width, height: state.height, curv: state.curv, phi: state.phi }); };
+$('domainReset').addEventListener('click', () => {
+  Object.assign(state, structuredClone(homeDomain));
+  for (const sl of [...domainSliders, phiSlider]) sl.refresh();
+  $('curv').checked = state.curv;
+  $('phiRow').classList.toggle('hide', state.curv);
+  if (whitham.curve) whitham.applied = null; // becomes the new base at the next Whitham move
+  needFrame = true;
+  changed(false);
+});
 $('pngBtn').addEventListener('click', () => download(viewer.snapshot(), 'cmc-surface.png'));
 $('objBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([viewer.toOBJ()], { type: 'text/plain' }));
@@ -584,15 +686,28 @@ function refreshAll() {
   if (!$('acc').value) { $('acc').add(new Option(`h ≤ ${state.hmax}`, String(state.hmax))); $('acc').value = String(state.hmax); }
   viewer.setScale(1 / (2 * state.H));
   $('closeInfo').textContent = '';
+  whithamRecentre();
   $('curv').checked = state.curv;
   $('phiRow').classList.toggle('hide', state.curv);
   $('colour').value = state.colour;
   viewer.setStyle({ gridStep: state.gridStep, lineWidth: state.lineW, grid: state.grid });
 }
 
+// a link pasted into the address bar of an open page (our own writes use replaceState, which is silent)
+window.addEventListener('hashchange', () => {
+  if (!readHash()) return;
+  if (anim) stopAnim();
+  syncTau();
+  refreshAll();
+  saveHomeDomain();
+  needFrame = true;
+  changed(false);
+});
+
 readHash();
 syncTau();
 makeWorker();
 refreshAll();
+saveHomeDomain();
 setBackground(state.bg);
 changed(false);
