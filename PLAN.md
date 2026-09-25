@@ -140,6 +140,12 @@ Open:
 - Blow-up view of the α → 0 corner (Carberry–Klein–Schmidt, arXiv:2110.01574): zoom into one bubble
   and rescale z and f, once the normalisation is settled.
 - Bubbleton presets: the 𝒲 tag shows NaN at a double branch point (show "–" and disable the slider).
+- **Soul conjecture.** Rescale the mean curvature automatically by a function of the distance from the
+  branch points to lam0. Hypothesis: as one or more alpha -> lam0 the surface degenerates to a cylinder,
+  but with H scaled correctly the cylinder's width shrinks and the limit is an interesting space curve.
+- **Soul conjecture II.** The same in a coordinate kappa adapted to the Sym point (from our preliminary
+  work): lam0 at kappa = 0 and the unit circle mapped to R. Rescaling kappa as the branch points come to
+  the Sym point should give the spectral data of a curve gamma: R -> R^3, as for the NLS system.
 - The algebraic Whitham ODE of the lemma (not needed for speed yet: 60–170 ms per family).
 - The $S^3$ version (two Sym points), and a pen-and-ink hatching style like the example page.
 - Direct dragging of divisor points (this needs an inverse map from divisor to $\tau$).
