@@ -109,7 +109,7 @@ const fmt = (x, d = 4) => String(+x.toFixed(d));
 function linkURL() {
   const p = new URLSearchParams();
   p.set('a', state.alphas.map(([re, im]) => `${fmt(re, 10)},${fmt(im, 10)}`).join(';'));
-  p.set('l', fmt(state.theta0));
+  p.set('l', fmt(state.theta0, 10));
   if (state.tau.length) p.set('t', state.tau.map((x) => fmt(x)).join(','));
   p.set('c', state.z0.map((x) => fmt(x)).join(','));
   p.set('d', `${fmt(state.width, 8)},${fmt(state.height, 8)}`);
@@ -125,6 +125,14 @@ function linkURL() {
   return `${location.origin}${location.pathname}${location.search}#${p.toString().replace(/%2C/g, ',').replace(/%3B/g, ';')}`;
 }
 const clearHash = () => history.replaceState(null, '', location.pathname + location.search);
+// Links written before lam0 kept full precision (4 decimals): a lam0 that close to a common root of the
+// differentials was on it, so put it back (this keeps the root-preserving flow available).
+function snapLinkLam() {
+  if (!state.alphas.length) return;
+  let roots = [];
+  try { roots = commonRootsOnCircle(state.alphas, 1e-5).map((r) => Math.atan2(r.lam[1], r.lam[0])); } catch { return; }
+  for (const t of roots) if (Math.abs(wrapPi(t - state.theta0)) < 1e-4) { state.theta0 = t; return; }
+}
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   if (!p.has('a')) return false;
@@ -1147,6 +1155,7 @@ window.addEventListener('hashchange', () => {
   const ok = readHash();
   clearHash();
   if (!ok) return;
+  snapLinkLam();
   if (anim) stopAnim();
   syncTau();
   refreshAll();
@@ -1155,7 +1164,7 @@ window.addEventListener('hashchange', () => {
   changed(false);
 });
 
-if (location.hash) { readHash(); clearHash(); }
+if (location.hash) { readHash(); snapLinkLam(); clearHash(); }
 syncTau();
 makeWorker();
 refreshAll();
