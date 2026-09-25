@@ -32,6 +32,9 @@ uniform vec2 uRange;      // sequential: [lo, hi] -> [0,1]; diverging: [lo, 0] -
 uniform float uGrid;      // 0 = off
 uniform float uGridStep;
 uniform float uLineW;
+uniform float uWire;      // 1 = wireframe: lines take the surface's colour
+uniform float uOpacity;   // of the fill
+uniform int uPass;        // 0 fill and lines, 1 lines only, 2 fill only
 varying vec3 vN;
 varying vec3 vPos;
 varying vec2 vSt;
@@ -80,17 +83,25 @@ void main() {
   float spec = pow(max(dot(n, normalize(L1 + v)), 0.0), 48.0) * 0.28;
   vec3 col = base * dif + vec3(spec + rim);
 
-  if (uGrid > 0.5) {
+  float line = 0.0;
+  if (uGrid > 0.5 && uPass != 2) {
     vec2 g = vSt / uGridStep;
     vec2 w = fwidth(g);
     vec2 d = abs(fract(g - 0.5) - 0.5) / max(w, vec2(1e-6));
     float dmin = min(d.x, d.y);
-    float line = 1.0 - smoothstep(uLineW - 0.5, uLineW + 0.5, dmin);
     // fade lines out where they would be denser than a few pixels
     float dens = clamp(1.5 - 3.0 * max(w.x, w.y), 0.0, 1.0);
-    col = mix(col, uInk, 0.8 * line * dens);
+    line = (1.0 - smoothstep(uLineW - 0.5, uLineW + 0.5, dmin)) * dens;
   }
-  gl_FragColor = vec4(col, 1.0);
+  if (uPass == 1) {
+    // lines alone, drawn first and writing depth, so the fill in front of them tints them
+    if (line < 0.02) discard;
+    gl_FragColor = vec4(uWire > 0.5 ? mix(col, uInk, 0.35) : uInk, min(1.0, line * (uWire > 0.5 ? 1.0 : 0.8)));
+  } else if (uPass == 2) {
+    gl_FragColor = vec4(col, uOpacity);
+  } else {
+    gl_FragColor = vec4(mix(col, uInk, 0.8 * line), 1.0);
+  }
 }`;
 
 export class Viewer {
@@ -114,14 +125,29 @@ export class Viewer {
       uGrid: { value: 1 },
       uGridStep: { value: 0.25 },
       uLineW: { value: 0.6 },
+      uWire: { value: 0 },
+      uOpacity: { value: 1 },
     };
-    this.material = new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms, side: THREE.DoubleSide,
-    });
     this.geometry = new THREE.BufferGeometry();
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
-    this.mesh.frustumCulled = false;
-    this.holder.add(this.mesh);
+    // opaque: one pass. See-through or wireframe: the lines (opaque, writing depth), then the fill
+    // (blended, not writing depth), so the lines never sort wrongly against the fill.
+    const mesh = (pass, opts, order) => {
+      const material = new THREE.ShaderMaterial({
+        vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide,
+        uniforms: { ...this.uniforms, uPass: { value: pass } }, ...opts,
+      });
+      const m = new THREE.Mesh(this.geometry, material);
+      m.frustumCulled = false;
+      m.renderOrder = order;
+      this.holder.add(m);
+      return m;
+    };
+    this.mesh = mesh(0, {}, 0);
+    this.lines = mesh(1, { transparent: true }, 1);
+    this.fill = mesh(2, { transparent: true, depthWrite: false }, 2);
+    this.wire = false;
+    this.opacity = 1;
+    this._passes();
 
     this.dist = 10;           // camera distance
     this.radius = 3;          // model radius from the last framing
@@ -186,8 +212,10 @@ export class Viewer {
     this.dirty = true;
   }
 
-  setStyle({ mode, range, grid, gridStep, lineWidth, front, back, ink }) {
+  setStyle({ mode, range, grid, gridStep, lineWidth, front, back, ink, wire, opacity }) {
     const u = this.uniforms;
+    if (wire !== undefined) this.wire = wire;
+    if (opacity !== undefined) this.opacity = opacity;
     if (mode !== undefined) u.uMode.value = mode;
     if (range) u.uRange.value.set(range[0], range[1]);
     if (grid !== undefined) u.uGrid.value = grid ? 1 : 0;
@@ -196,7 +224,17 @@ export class Viewer {
     if (front) u.uFront.value.set(front);
     if (back) u.uBack.value.set(back);
     if (ink) u.uInk.value.set(ink);
+    this._passes();
     this.dirty = true;
+  }
+
+  _passes() {
+    const u = this.uniforms, see = this.opacity < 1;
+    u.uWire.value = this.wire ? 1 : 0;
+    u.uOpacity.value = this.opacity;
+    this.mesh.visible = !this.wire && !see;
+    this.lines.visible = this.wire || (see && u.uGrid.value > 0.5);
+    this.fill.visible = !this.wire && see && this.opacity > 0;
   }
 
   setBackground(colour) {

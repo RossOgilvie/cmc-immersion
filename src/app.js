@@ -91,7 +91,7 @@ const PRESETS = [
 const state = {
   alphas: [polar(0.49, 1), polar(0.49, -1)], theta0: 0,
   ...VIEW_DEFAULTS, width: 6, height: 6,
-  res: 240, hmax: 0.05, colour: 'side', grid: true, H: 0.5, adapt: true,
+  res: 240, hmax: 0.05, colour: 'side', grid: true, transp: 0, H: 0.5, adapt: true,
   front: '#6f8fb0', back: '#e8c9a0', bg: '#f2eee3',
 };
 
@@ -115,6 +115,7 @@ function linkURL() {
   p.set('d', `${fmt(state.width, 8)},${fmt(state.height, 8)}`);
   if (!state.curv) p.set('p', fmt(state.phi));
   if (state.colour !== 'side') p.set('m', state.colour);
+  if (state.transp) p.set('o', fmt(state.transp, 2));
   p.set('g', fmt(state.gridStep));
   if (state.H !== 0.5) p.set('H', fmt(state.H));
   if (state.adaptive) p.set('h', 'a');
@@ -139,6 +140,7 @@ function readHash() {
     state.curv = !p.has('p');
     if (p.has('p')) state.phi = +p.get('p') || 0;
     if (p.has('m')) state.colour = p.get('m');
+    state.transp = Math.min(1, Math.max(0, +p.get('o') || 0));
     if (p.has('g')) state.gridStep = +p.get('g') || state.gridStep;
     if (p.has('H')) state.H = Math.max(0.01, +p.get('H') || 0.5);
     state.adaptive = p.get('h') === 'a';
@@ -277,7 +279,7 @@ function changed(dragging = false) {
 // ------------------------------------------------------------------ display
 
 function colourValues(res) {
-  if (state.colour === 'side') return { vals: null, range: [0, 1] };
+  if (state.colour === 'side' || state.colour === 'wire') return { vals: null, range: [0, 1] };
   const N = res.u.length;
   const vals = new Float32Array(N);
   for (let v = 0; v < N; v++) {
@@ -297,7 +299,7 @@ function show(res) {
   last = res;
   const { vals, range } = colourValues(res);
   viewer.setSurface(res, vals);
-  viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
+  viewer.setStyle(textureStyle(range));
   if (needFrame) { viewer.frame(); needFrame = false; }
   widget.set({ divisor: res.divisor });
   const g = genus();
@@ -558,6 +560,13 @@ const appearanceSliders = [
     recompute: false,
   }),
 ];
+const transpSlider = slider($('appearanceRows'), {
+  label: 'Transparency', title: 'How much of the surface shows through (the parameter lines stay opaque)',
+  min: 0, max: 1, step: 0.01, digits: 2, get: () => state.transp,
+  set: (v) => { state.transp = Math.min(1, Math.max(0, v)); viewer.setStyle({ opacity: 1 - state.transp }); },
+  recompute: false,
+});
+appearanceSliders.push(transpSlider);
 
 $('showDivisor').addEventListener('change', () => widget.set({ showDivisor: $('showDivisor').checked }));
 
@@ -573,7 +582,14 @@ function recolour() {
   if (!last) return;
   const { vals, range } = colourValues(last);
   if (vals) viewer.setColourValues(vals);
-  viewer.setStyle({ mode: { side: 0, u: 1, K: 2 }[state.colour], range });
+  viewer.setStyle(textureStyle(range));
+}
+function textureStyle(range) {
+  const wire = state.colour === 'wire';
+  // a wireframe is its parameter lines; transparency applies to the fill
+  $('grid').disabled = wire;
+  transpSlider.row.classList.toggle('hide', wire);
+  return { mode: { side: 0, u: 1, K: 2 }[state.colour] ?? 0, range, wire, grid: wire || state.grid, opacity: 1 - state.transp };
 }
 const Hslider = slider($('Hrow'), {
   label: '<i>H</i>', min: 0.05, max: 3, step: 0.01, digits: 2, get: () => state.H,
@@ -955,9 +971,9 @@ $('closeBtn').addEventListener('click', () => {
 
 $('colour').addEventListener('change', () => {
   state.colour = $('colour').value;
-  recolour();
+  if (last) recolour(); else viewer.setStyle(textureStyle());
 });
-$('grid').addEventListener('change', () => { state.grid = $('grid').checked; viewer.setStyle({ grid: state.grid }); });
+$('grid').addEventListener('change', () => { state.grid = $('grid').checked; viewer.setStyle(textureStyle()); });
 $('front').addEventListener('input', () => viewer.setStyle({ front: $('front').value }));
 $('back').addEventListener('input', () => viewer.setStyle({ back: $('back').value }));
 $('bg').addEventListener('input', () => setBackground($('bg').value));
@@ -1097,7 +1113,7 @@ function refreshAll() {
   $('curv').checked = state.curv;
   $('phiRow').classList.toggle('hide', state.curv);
   $('colour').value = state.colour;
-  viewer.setStyle({ gridStep: state.gridStep, lineWidth: state.lineW, grid: state.grid });
+  viewer.setStyle({ gridStep: state.gridStep, lineWidth: state.lineW, ...textureStyle() });
 }
 
 // a link pasted into the address bar of an open page (clearing the hash with replaceState is silent)

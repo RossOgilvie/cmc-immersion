@@ -67,7 +67,7 @@ test/
 - **Material** (custom `ShaderMaterial`): two-sided with distinct front/back colours (so the mean-curvature side is
   visible), Blinn–Phong lighting, and anti-aliased grid lines drawn in the fragment shader from the $z$-coordinate
   (`fwidth`). These are the curvature lines when the grid is rotated.
-- **Colour modes:** plain two-sided, conformal factor $u$, Gauss curvature $K$ (diverging map centred at 0).
+- **Texture modes:** plain two-sided, conformal factor $u$, Gauss curvature $K$ (diverging map centred at 0), wireframe (the parameter lines alone). A transparency slider fades the fill; then the lines are drawn first as an opaque, depth-writing pass and the fill blended over them, so lines never mis-sort against the fill.
 - **Extras:** PNG screenshot, OBJ export of the current mesh.
 
 ## 5. Spectral-data panel

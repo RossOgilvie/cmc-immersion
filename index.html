@@ -261,7 +261,7 @@
     <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="tauBox"><span class="chev" data-glyph="chev"></span>Isospectral deformation</button></h2>
     <div class="secbody" id="tauBox" hidden>
       <div id="tauList"></div>
-      <label class="cb"><input type="checkbox" class="chk" id="showDivisor" checked><span>Show the eigenline divisor in the λ-plane</span></label>
+      <label class="cb"><input type="checkbox" class="chk" id="showDivisor"><span>Show the eigenline divisor in the λ-plane</span></label>
       <p class="note" id="tauNote"></p>
     </div>
   </section>
@@ -283,11 +283,12 @@
   <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyLook"><span class="chev" data-glyph="chev"></span>Appearance</button></h2>
     <div class="secbody" id="bodyLook">
-      <div class="frow"><label for="colour">Colour</label>
+      <div class="frow"><label for="colour">Texture</label>
         <select id="colour">
           <option value="side">Two-sided</option>
           <option value="u">Conformal factor u</option>
           <option value="K">Gauss curvature K</option>
+          <option value="wire">Wireframe</option>
         </select></div>
       <label class="cb"><input type="checkbox" class="chk" id="grid" checked><span>Draw parameter lines</span></label>
       <div id="appearanceRows"></div>

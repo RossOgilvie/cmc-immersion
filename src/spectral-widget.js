@@ -28,7 +28,7 @@ export class SpectralWidget {
     this.theta0 = 0;
     this.divisor = [];
     this.commonRoots = [];
-    this.showDivisor = true;
+    this.showDivisor = false;
     this.drag = null;
     this.hover = null;
     this.colours = {};
