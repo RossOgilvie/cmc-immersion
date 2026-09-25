@@ -1,6 +1,6 @@
 # From spectral data to a CMC immersion of the plane
 
-Mathematical specification for an interactive renderer. The target is a map $f:\Omega\subset\mathbb C\to\mathbb R^3$ with constant mean curvature $H=\tfrac12$, computed from a real hyperelliptic spectral curve, a point of its isospectral set, and a Sym point. All formulas in Sections 1–8 have been checked numerically with the accompanying `cmc_reference.py`, and Section 9 has been partially checked (see there). That script is ground truth for porting.
+Mathematical specification for an interactive renderer. The target is a map $f:\Omega\subset\mathbb C\to\mathbb R^3$ with constant mean curvature $H=\tfrac12$, computed from a real hyperelliptic spectral curve, a point of its isospectral set, and a Sym point. All formulas in Sections 1–8 were checked numerically with a Python reference implementation (since retired; its values are frozen in `test/fixtures.json`), and Section 9 has been partially checked (see there).
 
 Method: polynomial Killing fields (Pinkall–Sterling 1989; in the $\lambda$-conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall), integrated as commuting ODEs. There are no theta functions and no period matrices, except for the closing conditions in Section 9, which are not needed for rendering planes.
 
@@ -216,7 +216,7 @@ This $N$ agrees with $f_x\times f_y/|f_x\times f_y|$ in the coordinates of Secti
 4. **Commutativity.** Integrating around a closed rectangle in $z$ returns $\zeta$ and $F$ to their start values up to integrator error.
 5. **Base-point divisor.** At $A=0$, the divisor readout returns exactly $\{\alpha_j\}$.
 
-`cmc_reference.py` runs checks 1–3 and 5.
+The Python reference ran checks 1–3 and 5; `test/run.mjs` compares the JavaScript against its frozen values.
 
 ---
 

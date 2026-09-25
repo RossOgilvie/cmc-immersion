@@ -2,7 +2,7 @@
 
 Goal: a single web page. Most of the screen is a 3D viewer of the CMC ($H=\tfrac12$) immersion
 $f:\Omega\subset\mathbb C\to\mathbb R^3$. A panel on the right edits the spectral data, and the surface
-recomputes live. The math follows `cmc_spectral_to_immersion.md` (§§1–8); `cmc_reference.py` is the ground truth.
+recomputes live. The math follows `cmc_spectral_to_immersion.md` (§§1–8); the values of the (retired) Python reference are frozen in `test/fixtures.json`.
 
 ---
 
@@ -23,7 +23,6 @@ src/
   spectral-widget.js    interactive λ-plane editor (canvas/SVG)
   app.js                glue: state, panel controls, progressive recompute
 test/
-  fixtures.py           dumps JSON test data from cmc_reference.py
   run.mjs               node test runner (fixtures + geometric invariants + Delaunay radii)
 ```
 
@@ -90,7 +89,7 @@ test/
 
 ## 6. Verification
 
-1. `test/fixtures.py` dumps, for several $(g,\alpha,A,\tau,\lambda_0)$: $\zeta^{\rm base}$, $\zeta^{\rm init}$, and a small grid of $f,N,u$.
+1. `test/fixtures.json` holds, for several $(g,\alpha,A,\tau,\lambda_0)$: $\zeta^{\rm base}$, $\zeta^{\rm init}$, and a small grid of $f,N,u$.
    `node test/run.mjs` compares the JS port to these values (target ~1e-10 for ζ, ~1e-8 for the grid).
 2. The same test runner re-implements §8's finite-difference checks in JS: conformality, $H=\tfrac12$, $Q$, the Delaunay neck and bulge radii,
    and the base-point divisor. It also checks commutativity on a closed rectangle.

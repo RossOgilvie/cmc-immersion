@@ -1,4 +1,4 @@
-// Tests for src/cmc against cmc_reference.py (via test/fixtures.json) and the checks of §8.
+// Tests for src/cmc against the Python reference values in test/fixtures.json and the checks of §8.
 // Run from the repository root:  node test/run.mjs
 
 import { readFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ const setDist = (A, B) => A.reduce((m, [ar, ai]) =>
   Math.max(m, Math.min(...B.map(([br, bi]) => Math.hypot(ar - br, ai - bi)))), 0);
 
 // ------------------------------------------------------------------ fixtures
-console.log('fixtures (JS vs cmc_reference.py):');
+console.log('fixtures (JS vs the Python reference):');
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures.json', import.meta.url)));
 for (const fx of fixtures) {
   const g = fx.alphas.length;

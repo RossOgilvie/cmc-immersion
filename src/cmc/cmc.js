@@ -1,5 +1,5 @@
 // CMC (H = 1/2) immersions from spectral data via polynomial Killing fields.
-// Section numbers refer to cmc_spectral_to_immersion.md; cmc_reference.py is the ground truth.
+// Section numbers refer to cmc_spectral_to_immersion.md; test/fixtures.json holds the reference values.
 //
 // Storage. A 2x2 complex matrix occupies 8 consecutive doubles
 //   [m11.re, m11.im, m12.re, m12.im, m21.re, m21.im, m22.re, m22.im].

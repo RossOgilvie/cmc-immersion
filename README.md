@@ -44,7 +44,6 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
     src/viewer.js          three.js scene, controls, shader (two-sided, curvature lines, colour maps)
     src/spectral-widget.js λ-plane editor
     src/app.js             panel, scheduling (coarse preview while dragging, then full), presets, export
-    test/                  node tests against cmc_reference.py:  python3 test/fixtures.py && node test/run.mjs
+    test/                  node tests:  node test/run.mjs  (fixtures.json: values from the retired Python reference)
     about.html             the "Learn more" page (maths typeset by Temml as MathML); img/: its pictures
     vendor/                three.js r186; temml/: Temml (MIT); fonts/: EB Garamond and Garamond-Math (SIL OFL)
-    old/                   the earlier theta-function attempt
