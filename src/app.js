@@ -662,16 +662,16 @@ function rootUpdate() {
 
 const WHY = {
   edge: '', circle: ' (a branch point nears the unit circle)', zero: ' (a branch point nears 0)',
-  collision: ' (two branch points meet)', fold: ' (φ folds over here)',
+  collision: ' (two branch points meet)', fold: ' (φ is not an immersion)', solver: ' (the solver can’t continue)',
 };
 
 function rootNote(phi, blocked, why = null) {
   const el = $('rootNote');
   if (!rootGenus()) { el.textContent = 'Even genus only, for now.'; return; }
   if (!phi) { el.textContent = 'Move λ₀ onto a common root (◆) to enable.'; return; }
+  const ends = blocked ? `\nThe flow ends here${WHY[why] || ''}` : '';
   if (genus() > 2) {
-    el.textContent = `φ = (${fixed(phi[0] / PI, 4)}, ${fixed(phi[1] / PI, 4)}) π, for an orthonormal basis of the period plane`;
-    if (blocked) el.textContent += ` · the flow ends here${WHY[why] || ''}`;
+    el.textContent = `φ = −i ln μ = (${fixed(phi[0] / PI, 4)}, ${fixed(phi[1] / PI, 4)}) π${ends}`;
     return;
   }
   const frac = (x) => {
@@ -682,9 +682,8 @@ function rootNote(phi, blocked, why = null) {
   };
   const f = phi.map(frac);
   el.textContent = f.every(Boolean)
-    ? `Torus: φ = (${f[0]}, ${f[1]}) π`
-    : `φ = (${fixed(phi[0] / PI, 3)}, ${fixed(phi[1] / PI, 3)}) π`;
-  if (blocked) el.textContent += ` · the flow ends here${WHY[why] || ''}`;
+    ? `φ = −i ln μ = (${f[0]}, ${f[1]}) π\nA torus`
+    : `φ = −i ln μ = (${fixed(phi[0] / PI, 3)}, ${fixed(phi[1] / PI, 3)}) π${ends}`;
 }
 
 function rootChase() {

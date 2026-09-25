@@ -287,7 +287,8 @@ export class RootFlow {
    * Moves towards target along the straight segment in phi, in steps of at most `step`, for at most
    * `budget` ms. Returns { alphas, phi, reached, blocked, why }: blocked when the flow can't continue,
    * why = 'circle' | 'zero' | 'collision' (a branch point near the unit circle or 0, or two meeting:
-   * an end of S^g) or 'fold' (the solver fails in the interior: phi folds over, and stops being a chart).
+   * an end of S^g), 'fold' (in the interior, phi is not an immersion: dphi restricted to the tangent
+   * plane of S^g nearly drops rank) or 'solver' (none of these: the solver can't continue).
    */
   moveToward(target, { step = 0.03, budget = 12 } = {}) {
     const t0 = performance.now();
@@ -339,7 +340,49 @@ export class RootFlow {
     for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
       if (Math.hypot(al[i][0] - al[j][0], al[i][1] - al[j][1]) < 0.02 * Math.max(rs[i], rs[j])) return 'collision';
     }
-    return 'fold';
+    const s = this.phiSingularValues();
+    return s && s[0] < 0.02 * s[1] ? 'fold' : 'solver';
+  }
+
+  /**
+   * Singular values [small, large] of dphi restricted to the tangent plane of S^g (with the plane and root
+   * fixed) at the current point: the tangent plane is the null space of the constraint rows of the
+   * Jacobian, found by projecting out the row space (Gram–Schmidt).
+   */
+  phiSingularValues() {
+    const x = this.x, r0 = this.residual(x, this.phi);
+    if (!r0) return null;
+    const eps = 1e-7, n = x.length, m = r0.F.length;
+    const J = Array.from({ length: m }, () => new Array(n).fill(0)); // J[k][i]
+    for (let i = 0; i < n; i++) {
+      const xp = x.slice(); xp[i] += eps;
+      const rp = this.residual(xp, this.phi);
+      if (!rp) return null;
+      rp.F.forEach((v, k) => { J[k][i] = (v - r0.F[k]) / eps; });
+    }
+    // orthonormal basis of the row space of the constraints (all rows but the last two)
+    const basis = [];
+    const scale = Math.max(...J.slice(0, m - 2).map((row) => Math.hypot(...row)));
+    for (const row of J.slice(0, m - 2)) {
+      let v = row.slice();
+      for (const u of basis) { const d = v.reduce((s, a, i) => s + a * u[i], 0); v = v.map((a, i) => a - d * u[i]); }
+      const nv = Math.hypot(...v);
+      if (nv > 1e-6 * scale) basis.push(v.map((a) => a / nv));
+    }
+    // the tangent plane: complete the basis with unit vectors
+    const T = [];
+    for (let k = 0; k < n && T.length < n - basis.length; k++) {
+      let v = Array.from({ length: n }, (_, i) => (i === k ? 1 : 0));
+      for (const u of [...basis, ...T]) { const d = v.reduce((s, a, i) => s + a * u[i], 0); v = v.map((a, i) => a - d * u[i]); }
+      const nv = Math.hypot(...v);
+      if (nv > 0.3) T.push(v.map((a) => a / nv));
+    }
+    if (T.length !== 2) return null;
+    const M = J.slice(m - 2).map((row) => T.map((t) => row.reduce((s, a, i) => s + a * t[i], 0)));
+    const a = M[0][0], b = M[0][1], c = M[1][0], d = M[1][1];
+    const S1 = a * a + b * b + c * c + d * d, D = Math.abs(a * d - b * c);
+    const big = Math.sqrt((S1 + Math.sqrt(Math.max(0, S1 * S1 - 4 * D * D))) / 2);
+    return [D / big, big];
   }
 
 }

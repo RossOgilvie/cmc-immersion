@@ -134,9 +134,13 @@ Open:
 - Root-preserving flow: done for even g (g >= 4 with the period plane as 2(g - 2) extra equations, a basis
   orthonormal in the plane, and a pad that marks where the flow stops). phi folds over within ~0.02 pi of
   the anchor in the examples tried, so the pad can't pass folds: continuing past one needs path-following
-  on S^g itself (e.g. arclength along the fold, or a pad in other coordinates). Open: odd g (the definition
-  of phi); an integer basis of the period plane when it is rational (so grid points are tori again); the
+  on S^g itself (e.g. arclength along the fold, or a pad in other coordinates). Open: an integer basis of the period plane when it is rational (so grid points are tori again); the
   flow off the main thread (a g = 4 step takes ~100 ms); an extension off S^g, ideally to all of H^g.
+- **Root-preserving flow for odd g.** Over the unit circle Σ_R is two circles swapped by σ, so the
+  primitive q of Lemma 1.2 (CKKS) with σ*q = −q is not determined: there is no path in Σ_R from σ(y) to y,
+  the integration constant on each circle is free, and each circle is a cycle with a possibly nonzero
+  period. Going through a branch point (μ = ±1) gives φ modulo periods: an angle mod π when the periods
+  are integral (rational plane, integer basis), nothing canonical otherwise. Needs a new normalisation.
 - Blow-up view of the α → 0 corner (Carberry–Klein–Schmidt, arXiv:2110.01574): zoom into one bubble
   and rescale z and f, once the normalisation is settled.
 - Bubbleton presets: the 𝒲 tag shows NaN at a double branch point (show "–" and disable the slider).
