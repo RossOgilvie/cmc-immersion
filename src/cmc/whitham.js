@@ -145,7 +145,7 @@ export class WhithamCurve {
     }
     if (!(res < Math.max(1e-9, 10 * tol))) return null;
     const alphas = toAlphas(y.slice(0, n));
-    const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 1e-3 || r > 0.999; })
+    const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 0.02 || r > 0.98; })
       || alphas.some((a, i) => alphas.some((c, j) => j > i && Math.hypot(a[0] - c[0], a[1] - c[1]) < 2e-3));
     if (bad) return null;
     const J = this.jacobian(y, ell);

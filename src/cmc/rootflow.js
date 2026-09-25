@@ -130,6 +130,9 @@ export function onS(alphas, theta0, tol = 1e-6) {
 // Unknowns: per branch point (logit |alpha|, arg alpha), so that alpha -> 0 and |alpha| -> 1 are both at
 // infinity and finite-difference steps are relative.
 const R_LO = 1e-6, R_HI = 0.999;
+// genus 2: phi fills the triangle phi_1, phi_2 > 0, phi_1 + phi_2 < pi (CKKS, Theorem 1.3)
+const edgeDistance = ([p1, p2]) => Math.min(p1, p2, (Math.PI - p1 - p2) / Math.SQRT2);
+const EDGE_MARGIN = 0.005;
 const flat = (alphas) => alphas.flatMap(([re, im]) => { const r = Math.hypot(re, im); return [Math.log(r / (1 - r)), Math.atan2(im, re)]; });
 const unflat = (x) => Array.from({ length: x.length / 2 }, (_, j) => {
   const r = 1 / (1 + Math.exp(-x[2 * j])), t = x[2 * j + 1];
@@ -232,29 +235,31 @@ export class RootFlow {
     if (!this.lastTarget || this.lastTarget[0] !== target[0] || this.lastTarget[1] !== target[1]) {
       this.lastTarget = target.slice();
       this.h = step;
-      this.tiny = 0;
     }
     let h = this.h, blocked = false;
-    // near an end of S^2 the solver keeps succeeding with ever smaller steps (alpha -> the circle or 0);
-    // a run of tiny accepted steps counts as reaching the end
     while (performance.now() - t0 < budget) {
       const dphi = [target[0] - this.phi[0], target[1] - this.phi[1]];
       const dist = Math.hypot(dphi[0], dphi[1]);
       if (dist < 1e-9) break;
+      // Near the edge of the triangle the chart phi degenerates (a small change of phi needs a large
+      // change of alpha), so steps are kept below 0.3 x the distance to the edge, and the flow stops
+      // EDGE_MARGIN short of it, from where it can always step back inside.
+      const e0 = edgeDistance(this.phi), cap = Math.max(1e-7, Math.min(step, 0.3 * e0));
+      h = Math.min(h, cap);
       const f = Math.min(1, h / dist);
       const want = [this.phi[0] + f * dphi[0], this.phi[1] + f * dphi[1]];
+      const ew = edgeDistance(want);
+      if (ew < EDGE_MARGIN && ew < e0) { blocked = true; break; }
       const res = this.correct(this.x, want);
       // reject jumps: a converged point far from the start is on another branch
       if (res && Math.hypot(...res.x.map((v, i) => v - this.x[i])) < 0.5) {
         this.x = res.x;
         this.phi = res.phi;
-        this.tiny = h < step / 32 && f < 1 ? this.tiny + 1 : 0;
-        if (this.tiny >= 6) { blocked = true; this.tiny = 0; break; }
-        h = Math.min(step, h * 1.5);
-      } else if (h > step / 256) {
+        h = Math.min(step, h * 2);
+      } else if (h > cap / 1024) {
         h /= 4;
       } else {
-        blocked = true;
+        blocked = true; // the solver can't continue (an end of S^2 inside the margin, or a failure)
         break;
       }
     }
@@ -263,4 +268,5 @@ export class RootFlow {
     const reached = Math.hypot(target[0] - this.phi[0], target[1] - this.phi[1]) < 1e-9;
     return { alphas: this.alphas, phi: this.phi.slice(), reached, blocked };
   }
+
 }
