@@ -829,7 +829,7 @@ function endText(e) {
   const plural = e.idx.length > 1;
   if (e.kind === 'circle') return `${who} ${plural ? 'reach' : 'reaches'} the unit circle`;
   if (e.kind === 'zero') return `${who} ${plural ? 'reach' : 'reaches'} 0`;
-  if (e.kind === 'collision') return `${a(e.idx[0])} and ${a(e.idx[1])} meet (singular spectral curve)`;
+  if (e.kind === 'collision') return `${a(e.idx[0])} and ${a(e.idx[1])} meet`;
   return 'the continuation fails (other)';
 }
 function showEnds() {
