@@ -107,7 +107,6 @@
   .tag:hover { color: var(--accent); }
   .tagin { position: absolute; top: -3px; transform: translateX(-50%); width: 72px; text-align: center; font-size: 14px; }
   .tick { position: absolute; top: 24px; width: 1px; height: 12px; margin-left: -0.5px; background: var(--ink); pointer-events: none; }
-  .tickmark { display: inline-block; width: 1px; height: 12px; background: var(--ink); margin-right: 8px; vertical-align: -1px; }
 
   /* number fields: underline only */
   .num {
@@ -159,9 +158,9 @@
   .genus { display: flex; align-items: center; }
   .genus #genus { min-width: 12px; text-align: center; }
   #lam { width: 100%; aspect-ratio: 1; display: block; touch-action: none; margin: 4px 0 2px; }
-  .lamrow, .bprow { display: grid; align-items: center; column-gap: 4px; }
-  .lamrow { grid-template-columns: 34px 1fr 60px 18px 34px; height: 40px; border-top: 1px solid var(--rule); padding-top: 4px; }
-  .lamrow .sym { font-size: 19px; color: var(--accent); }
+  .bprow { display: grid; align-items: center; column-gap: 4px; }
+  .lamrow .sym { font-size: 18px; color: var(--accent); }
+  .lamrow:hover { background: none; }
   .lab { color: var(--muted); font-style: italic; text-align: right; }
   .bphead { height: 30px; margin-top: 2px; }
   .bphead i { font-style: italic; }
@@ -170,7 +169,7 @@
   }
   .bprow:hover { background: var(--shade); }
   .bprow.sel { background: var(--shade); }
-  .bprow .disc { font-size: 18px; gap: 0; }
+  .bprow .disc { font-size: 18px; display: inline-block; }
   .bprow.sel .disc { color: var(--accent); }
   .bprow .gly { justify-self: end; }
   sub { font-size: 0.68em; line-height: 0; }
@@ -206,7 +205,7 @@
   <p class="sub">Immersions of the plane with constant mean curvature, built from spectral data by integrating polynomial Killing fields.</p>
 
   <section class="sec">
-    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyH"><span class="chev" data-glyph="chev"></span>Mean curvature</button></h2>
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="bodyH"><span class="chev" data-glyph="chev"></span>Mean curvature</button></h2>
     <div class="secbody" id="bodyH"><div id="Hrow"></div></div>
   </section>
 
@@ -225,15 +224,18 @@
         <p>Drag the branch points α (black dots) and the Sym point λ₀ (rust dot); click a branch point to select it. A small rust diamond on the circle marks a common root of the differentials Θ, where λ₀ closes up translationally in every direction; λ₀ snaps onto it. Shift-drag turns everything together. Double-click to add or remove a branch point. The grey rings mark the eigenline divisor at the centre of the domain.</p>
       </div>
       <canvas id="lam"></canvas>
-      <div class="lamrow">
-        <span class="sym">λ<sub>0</sub></span>
-        <label class="lab" for="theta0">arg</label>
-        <input class="num" id="theta0" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of λ0 in units of π">
-        <span class="muted">π</span>
-        <button class="gly" id="playLam" type="button" data-glyph="play" aria-label="Sweep λ0 around the circle" title="sweep λ₀ around the circle (associated family)"></button>
+      <button class="disc bphead" type="button" aria-expanded="false" aria-controls="bpList"><span class="chev" data-glyph="chev"></span><i>branch points and Sym point</i></button>
+      <div id="bpList" hidden>
+        <div id="alphaList"></div>
+        <div class="bprow lamrow">
+          <span class="sym">λ<sub>0</sub></span>
+          <span></span><span></span>
+          <label class="lab" for="theta0">arg</label>
+          <input class="num" id="theta0" type="text" inputmode="decimal" autocomplete="off" aria-label="Argument of λ0 in units of π">
+          <span class="muted">π</span>
+          <button class="gly" id="playLam" type="button" data-glyph="play" aria-label="Sweep λ0 around the circle" title="sweep λ₀ around the circle (associated family)"></button>
+        </div>
       </div>
-      <button class="disc bphead" type="button" aria-expanded="true" aria-controls="alphaList"><span class="chev" data-glyph="chev"></span><i>branch points</i> <span class="muted" id="bpCount"></span></button>
-      <div id="alphaList"></div>
     </div>
   </section>
 
@@ -322,7 +324,7 @@
       <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
       <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
       <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
-      <p>The slider shows the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (in the frame fixed at the centre of the slider); click the value to enter one. With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by 𝒲 (blue low, rust high). A tick across the paths, and on the slider, marks critical points of 𝒲, which are where the differentials have a common root, as for tori; the slider snaps onto it.</p>
+      <p>The slider shows the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (in the frame fixed where the slider was last recentred); click the value to enter one. The slider spans the whole family: its ends are where the flow meets an obstacle, a branch point reaching 0 or the unit circle (or two colliding). With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by 𝒲 (blue low, rust high). A tick across the paths, and on the slider, marks critical points of 𝒲, which are where the differentials have a common root, as for tori; the slider snaps onto it.</p>
       <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>. Type: EB Garamond (SIL Open Font License).</p>
     </div>
   </section>

@@ -373,7 +373,6 @@ function buildAlphaList() {
     box.appendChild(row);
   });
   $('genus').textContent = String(genus());
-  $('bpCount').textContent = `(${genus()})`;
   $('remAlpha').disabled = !genus();
   $('addAlpha').disabled = genus() >= MAX_GENUS;
   refreshAlphaValues();
@@ -421,7 +420,7 @@ $('remAlpha').addEventListener('click', () => removeAlpha(selected >= 0 ? select
  * else set(x * unit)). snap() lists values that get a tick on the track and catch the thumb within a
  * few pixels. play: an animation toggle; reset: { title, onClick } for a second button.
  */
-function slider(parent, { label, min, max, step, get, set, digits = 3, unit = 1, suffix = '', display, entry, enter,
+function slider(parent, { label, min: lo, max: hi, step, get, set, digits = 3, unit = 1, suffix = '', display, entry, enter,
   snap, play, reset, recompute = true, title }) {
   const after = recompute ? changed : writeHashSoon;
   const id = `sl${(slider.n = (slider.n || 0) + 1)}`;
@@ -432,6 +431,7 @@ function slider(parent, { label, min, max, step, get, set, digits = 3, unit = 1,
   const rng = row.querySelector('input'), tag = row.querySelector('.tag'), trk = row.querySelector('.trk');
   const acts = row.querySelector('.acts');
   if (title) row.title = title;
+  let min = lo, max = hi;
   Object.assign(rng, { min, max, step });
   const frac = (v) => Math.min(1, Math.max(0, (v - min) / (max - min)));
   const at = (f) => `calc(6.5px + (100% - 13px) * ${f.toFixed(5)})`;
@@ -511,7 +511,13 @@ function slider(parent, { label, min, max, step, get, set, digits = 3, unit = 1,
   if (reset) button('reset', reset.title, reset.onClick);
   parent.appendChild(row);
   refresh();
-  return { refresh, row };
+  const setRange = (a, b) => {
+    if (a === min && b === max) return;
+    [min, max] = [a, b];
+    Object.assign(rng, { min, max });
+    refresh();
+  };
+  return { refresh, row, setRange };
 }
 
 let tauSliders = [];
@@ -523,10 +529,11 @@ function buildTau() {
     label: `<i>τ</i><sub>${i + 1}</sub>`, min: -2 * PI, max: 2 * PI, step: 0.001,
     get: () => state.tau[i], set: (v) => { state.tau[i] = v; },
     play: { key: 'tau', i },
+    reset: { title: `set τ${i + 1} back to 0`, onClick: () => { state.tau[i] = 0; tauSliders[i].refresh(); changed(false); } },
   }));
   const g = genus();
   $('tauNote').textContent = g >= 3
-    ? `Times along the ${g - 2} shape-changing isospectral flows (the other two flows are translations of the domain).`
+    ? `${g === 3 ? 'Time along the shape-changing isospectral flow' : `Times along the ${g - 2} shape-changing isospectral flows`} (the other two flows are translations of the domain).`
     : 'For genus ≤ 2 every isospectral deformation is a translation of the domain: use the domain centre below.';
 }
 
@@ -609,16 +616,7 @@ function whithamRecentre() {
 function whithamNote() {
   const g = genus();
   $('whithamBox').querySelectorAll('input, button').forEach((el) => { el.disabled = g < 2; });
-  if (g < 2) { $('whithamNote').textContent = 'Needs genus ≥ 2.'; return; }
-  const F = family.data;
-  if (!F || F.points.length < 2) {
-    $('whithamNote').textContent = 'Moves the branch points keeping the conformal type of the period lattice.';
-    return;
-  }
-  const P = F.points, Ws = P.map((p) => p.W);
-  const lines = F.critical.map((c) => `<span class="tickmark"></span>critical 𝒲 = ${fixed(P[c].W, 4)}`);
-  lines.push(`family: 𝒲 from ${fixed(Math.min(...Ws), 3)} to ${fixed(Math.max(...Ws), 3)}`);
-  $('whithamNote').innerHTML = lines.join('<br>');
+  $('whithamNote').textContent = g < 2 ? 'Needs genus ≥ 2.' : '';
 }
 
 // W at the current spectral data, in the frame of the slider's centre (the curve's anchor)
@@ -632,14 +630,25 @@ function currentW() {
   return currentW.val;
 }
 
-// the family (Whitham curve through the current data) for the λ-plane, traced in its own worker so it
-// never delays the surface; the latest request wins. Moving along the curve with the slider doesn't
-// change the family, so only other edits of the spectral data (or recentring) trigger a new trace.
+// the family (Whitham curve through the current data), traced in its own worker so it never delays the
+// surface; the latest request wins. It is traced in both directions until the flow meets an obstacle
+// (a branch point reaching 0 or the unit circle, two colliding, or the continuation failing), and those
+// ends are the ends of the slider. It is drawn in the λ-plane when the switch is on. Moving along the
+// curve with the slider doesn't change the family, so only other edits of the spectral data (or
+// recentring) trigger a new trace.
 const family = { worker: null, busy: false, pending: null, key: null, data: null };
+const WHITHAM_RANGE = [-1.5, 1.5]; // until the first family arrives
+function showFamily() {
+  widget.set({ family: $('showFamily').checked ? family.data : null });
+}
+function familyRange() {
+  const P = family.data && family.data.points;
+  return P && P.length > 1 ? [P[0].s, P[P.length - 1].s] : WHITHAM_RANGE;
+}
 function requestFamily() {
-  if (!$('showFamily').checked || genus() < 2) {
+  if (genus() < 2) {
     family.pending = null;
-    if (family.data) { family.data = null; family.key = null; widget.set({ family: null }); }
+    if (family.data) { family.data = null; family.key = null; showFamily(); }
     return;
   }
   const key = JSON.stringify(state.alphas);
@@ -656,10 +665,10 @@ function pumpFamily() {
       family.busy = false;
       const { result, error } = e.data;
       // show every result, even if a newer request is queued: during a drag that keeps the paths live
-      if ($('showFamily').checked && genus() >= 2) {
+      if (genus() >= 2) {
         family.data = error ? null : result;
-        widget.set({ family: family.data });
-        whithamNote();
+        showFamily();
+        whithamSlider.setRange(...familyRange());
         whithamSlider.refresh();
       }
       pumpFamily();
@@ -668,7 +677,7 @@ function pumpFamily() {
   const job = family.pending;
   family.pending = null;
   family.busy = true;
-  family.worker.postMessage({ id: 0, kind: 'family', params: { alphas: job.alphas, smax: 1.5, maxSteps: 80 } });
+  family.worker.postMessage({ id: 0, kind: 'family', params: { alphas: job.alphas, smax: 30, maxSteps: 400 } });
 }
 function whithamMove(s) {
   if (genus() < 2) return s;
@@ -748,7 +757,7 @@ function whithamEnter(target) {
   if (!C) return;
   const W = (t) => C.willmore(C.at(t))[0];
   const P = family.data ? family.data.points
-    : Array.from({ length: 61 }, (_, k) => { const t = -1.5 + k * 0.05; return { s: t, W: W(t) }; });
+    : Array.from({ length: 61 }, (_, k) => { const t = -1.5 + k * 0.05; return { s: t, W: W(t) }; }); // family not in yet
   let best = null;
   for (let i = 1; i < P.length; i++) {
     const a = P[i - 1].W - target, b = P[i].W - target;
@@ -767,11 +776,12 @@ function whithamEnter(target) {
     }
     if (Math.abs(t1 - best) <= 0.2) best = t1;
   }
-  whithamMove(Math.max(-1.5, Math.min(1.5, best)));
+  const [a, b] = familyRange();
+  whithamMove(Math.max(a, Math.min(b, best)));
 }
 
 const whithamSlider = slider($('whithamRow'), {
-  label: '𝒲', min: -1.5, max: 1.5, step: 0.001, get: () => whitham.s,
+  label: '𝒲', min: -1.5, max: 1.5, step: 'any', get: () => whitham.s,
   set: (v) => { whithamMove(v); },
   display: () => { const W = currentW(); return W === null ? '–' : fixed(W, 4); },
   entry: () => { const W = currentW(); return W === null ? '' : fixed(W, 4); },
@@ -780,7 +790,7 @@ const whithamSlider = slider($('whithamRow'), {
   play: { key: 'whitham' },
   reset: { title: 'recentre: make the current spectral curve the centre of the slider', onClick: () => { whithamRecentre(); requestFamily(); } },
 });
-$('showFamily').addEventListener('change', () => { family.key = null; requestFamily(); whithamNote(); });
+$('showFamily').addEventListener('change', showFamily);
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
 
 // ------------------------------------------------------------------ closing up
@@ -872,8 +882,9 @@ function animStep(now) {
     if (!busy) {
       anim.dir = anim.dir || 1;
       const want = whitham.s + anim.dir * 0.15 * dt;
-      const got = whithamMove(Math.max(-1.5, Math.min(1.5, want)));
-      if (Math.abs(got - want) > 1e-9 || Math.abs(got) >= 1.5) anim.dir = -anim.dir;
+      const [a, b] = familyRange();
+      const got = whithamMove(Math.max(a, Math.min(b, want)));
+      if (Math.abs(got - want) > 1e-9 || got <= a || got >= b) anim.dir = -anim.dir;
       whithamSlider.refresh();
     }
   } else {
