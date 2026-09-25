@@ -111,17 +111,33 @@ test/
   Newton); `src/cmc/periods.js` computes the periods of Θ_w and the lattice Γ (§9.1–9.3); `closingInfo`
   does the §9.4 shooting check; metric-adapted meshes; per-step adaptive RK4 step.
 
-## 9. Out of scope for now (noted for later)
+## 9. Future work
 
+Done so far, for reference: the Whitham family in the λ-plane (traced in a worker, chord Newton, 𝒲 from
+the residue formula); the Whitham slider, parametrised by 𝒲, with its ends at the obstacles and
+"Flow to common root"; the genus-2 root-preserving flow as a pad of the Sym integrals (phi_1, phi_2),
+solved by Gauss–Newton with the common root pinned at lam0 (src/cmc/rootflow.js).
+
+Open:
+
+- **Video export of the τ-Whitham family.** Candidate formats: video (WebM/MP4 via MediaRecorder on the
+  canvas), GIF, an SVG animation (SMIL or CSS keyframes over per-frame line drawings), or something else.
+- **Doubly periodic case: τ and the fundamental domain.** Compute the conformal type τ of the lattice Γ
+  and display the F_1, F_3 or F_6 domain.
+- **Projection to the doubly periodic case.** Doubly periodic data are dense in H^g, so "the nearest"
+  isn't well defined. One idea: for the current finite domain in C, give each point a distance to the
+  nearest integer periods; pick the two independent points with the lowest value; step in H^g in the
+  direction that moves those periods towards integral periods. Other schemes are possible, and the
+  choice of distance to the integer points is open to experiment.
 - General torus search (closing conditions in the UI), and a "close up" that uses the lattice Γ rather
-  than the grid axes (so non-rectangular fundamental domains work).
-- Whitham family in the λ-plane: done (traced in a worker, chord Newton, W from the residue formula).
-  Not done: the algebraic Whitham ODE of the lemma (not needed for speed yet: 60–170 ms per family).
-- Whitham: done as a slider (continuation keeping [ell] in CP^{g-1} and arg a(0) fixed). Open: use the
-  Willmore functional as the flow parameter, and follow the common root of B_a as a moving Sym point.
-- Root-preserving flow (CKKS), genus 2: done as a pad of the Sym integrals (phi_1, phi_2), solved by
-  Gauss–Newton with the common root pinned at lam0 (src/cmc/rootflow.js). Open: odd g (definition of phi),
-  g >= 3 (period plane as extra constraint; phi may fail to be a chart: path-follow and mark folds), an
-  extension off S^g, and a close-up that uses the torus lattice at rational phi.
+  than the grid axes (so non-rectangular fundamental domains work; for the root-preserving flow, the
+  torus lattice at rational phi).
+- Root-preserving flow beyond genus 2: odd g (the definition of phi is open); g >= 3 (the period plane as
+  an extra constraint; phi may fail to be a chart: path-follow and mark folds); an extension off S^g,
+  ideally to all of H^g.
+- Blow-up view of the α → 0 corner (Carberry–Klein–Schmidt, arXiv:2110.01574): zoom into one bubble
+  and rescale z and f, once the normalisation is settled.
+- Bubbleton presets: the 𝒲 tag shows NaN at a double branch point (show "–" and disable the slider).
+- The algebraic Whitham ODE of the lemma (not needed for speed yet: 60–170 ms per family).
 - The $S^3$ version (two Sym points), and a pen-and-ink hatching style like the example page.
 - Direct dragging of divisor points (this needs an inverse map from divisor to $\tau$).
