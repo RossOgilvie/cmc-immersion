@@ -31,7 +31,7 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
   across the paths at the critical points of 𝒲.
 - **Domain:** *close up* trims to one closed piece along the grid directions; *reset domain* returns to
   the domain of the last preset, link or close-up. *Reset view* resets the rotation and frames.
-- The state lives in the URL hash, so links reproduce the surface.
+- *Copy link* copies a URL that reproduces the surface; opening it loads that state and then clears it from the address bar.
 
 ## Layout
 

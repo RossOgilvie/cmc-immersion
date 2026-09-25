@@ -99,10 +99,12 @@ function syncTau() {
   state.tau = Array.from({ length: n }, (_, i) => state.tau[i] || 0);
 }
 
-// ------------------------------------------------------------------ URL hash
+// ------------------------------------------------------------------ links
+// The state goes into the URL only through "Copy link". A page opened from such a link (or with one
+// pasted into its address bar) takes the state from the hash and then clears it from the address bar.
 
 const fmt = (x, d = 4) => String(+x.toFixed(d));
-function writeHash() {
+function linkURL() {
   const p = new URLSearchParams();
   p.set('a', state.alphas.map(([re, im]) => `${fmt(re, 10)},${fmt(im, 10)}`).join(';'));
   p.set('l', fmt(state.theta0));
@@ -116,8 +118,9 @@ function writeHash() {
   if (state.hmax !== 0.05) p.set('h', fmt(state.hmax));
   if (state.res !== 240) p.set('r', state.res);
   // commas and semicolons are safe in a fragment; keep the link readable
-  history.replaceState(null, '', '#' + p.toString().replace(/%2C/g, ',').replace(/%3B/g, ';'));
+  return `${location.origin}${location.pathname}${location.search}#${p.toString().replace(/%2C/g, ',').replace(/%3B/g, ';')}`;
 }
+const clearHash = () => history.replaceState(null, '', location.pathname + location.search);
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   if (!p.has('a')) return false;
@@ -254,8 +257,6 @@ function changed(dragging = false) {
   request(false);
   clearTimeout(fullTimer);
   fullTimer = setTimeout(() => request(true), dragging || anim ? 350 : 0);
-  clearTimeout(changed.hashTimer);
-  changed.hashTimer = setTimeout(writeHash, 300);
 }
 
 // ------------------------------------------------------------------ display
@@ -408,7 +409,7 @@ $('remAlpha').addEventListener('click', () => removeAlpha(genus() - 1));
  */
 function slider(parent, { label, min: lo, max: hi, step, get, set, digits = 3, unit = 1, suffix = '', display, entry, enter,
   snap, play, reset, recompute = true, title }) {
-  const after = recompute ? changed : writeHashSoon;
+  const after = recompute ? changed : () => {};
   const id = `sl${(slider.n = (slider.n || 0) + 1)}`;
   const row = document.createElement('div');
   row.className = 'sl';
@@ -541,7 +542,6 @@ const appearanceSliders = [
     recompute: false,
   }),
 ];
-function writeHashSoon() { clearTimeout(changed.hashTimer); changed.hashTimer = setTimeout(writeHash, 300); }
 
 $('curv').addEventListener('change', () => {
   state.curv = $('curv').checked;
@@ -819,7 +819,6 @@ $('closeBtn').addEventListener('click', () => {
 $('colour').addEventListener('change', () => {
   state.colour = $('colour').value;
   recolour();
-  writeHashSoon();
 });
 $('grid').addEventListener('change', () => { state.grid = $('grid').checked; viewer.setStyle({ grid: state.grid }); });
 $('front').addEventListener('input', () => viewer.setStyle({ front: $('front').value }));
@@ -924,14 +923,14 @@ $('objBtn').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('linkBtn').addEventListener('click', async () => {
-  writeHash();
+  const url = linkURL();
   try {
-    await navigator.clipboard.writeText(location.href);
+    await navigator.clipboard.writeText(url);
     $('linkBtn').textContent = 'Copied';
+    setTimeout(() => { $('linkBtn').textContent = 'Copy link'; }, 1500);
   } catch {
-    $('linkBtn').textContent = 'See address bar';
+    window.prompt('Copy this link:', url); // no clipboard access (e.g. not https)
   }
-  setTimeout(() => { $('linkBtn').textContent = 'Copy link'; }, 1500);
 });
 function download(href, name) {
   const a = document.createElement('a');
@@ -960,9 +959,11 @@ function refreshAll() {
   viewer.setStyle({ gridStep: state.gridStep, lineWidth: state.lineW, grid: state.grid });
 }
 
-// a link pasted into the address bar of an open page (our own writes use replaceState, which is silent)
+// a link pasted into the address bar of an open page (clearing the hash with replaceState is silent)
 window.addEventListener('hashchange', () => {
-  if (!readHash()) return;
+  const ok = readHash();
+  clearHash();
+  if (!ok) return;
   if (anim) stopAnim();
   syncTau();
   refreshAll();
@@ -971,7 +972,7 @@ window.addEventListener('hashchange', () => {
   changed(false);
 });
 
-readHash();
+if (location.hash) { readHash(); clearHash(); }
 syncTau();
 makeWorker();
 refreshAll();
