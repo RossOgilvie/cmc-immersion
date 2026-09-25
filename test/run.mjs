@@ -214,6 +214,17 @@ for (const [name, al] of [
   check(`${name}: lattice of the deformed curve = Gamma(0)/z`, ok ? worst : Infinity, 1e-6);
 }
 {
+  // the Willmore functional of the paper is real along the flow, and stationary where B_a has a
+  // common root (the Wente torus has one, at lam0 = 1)
+  const C = new WhithamCurve([[0.1412634686, 0.1017768953], [0.1412634686, -0.1017768953]]);
+  let im = 0;
+  for (const s of [-0.1, 0, 0.3]) { const W = C.willmore(C.at(s)); im = Math.max(im, Math.abs(W[1] / W[0])); }
+  check('Willmore functional is real', im, 1e-10);
+  const e = 1e-3, w = (s) => C.willmore(C.at(s))[0];
+  check('dW/ds = 0 at the Wente torus (relative to the change over 0.2)',
+    Math.abs((w(e) - w(-e)) / (2 * e)) / Math.abs((w(0.2) - w(0)) / 0.2), 1e-3);
+}
+{
   // genus 3 (generally no lattice): the curve continues and keeps [ell] in CP^2 fixed
   const C = new WhithamCurve([[0.4, 0.25], [-0.3, 0.5], [0.1, -0.6]]);
   const r = C.at(0.2), q = C.at(-0.2);

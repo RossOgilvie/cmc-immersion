@@ -5,13 +5,25 @@
 // {0, alpha_j} (the A-periods, around {alpha_j, 1/conj(alpha_j)}, vanish identically), write
 //   L_alpha(w)_j = Re(ell_j w),   ell_j = v1_j - i v2_j,   v1 = L(1), v2 = L(i).
 // The plane with its complex structure is the complex line [ell] in CP^{g-1}, so the leaf is
-//   ell(alpha(t)) = z(t) ell(alpha(0)),  z(t) in C^*,
-// which is 2g-2 real equations on the 2g real coordinates of alpha. The remaining freedom besides the
-// Whitham flow is the rotation alpha -> e^{i phi} alpha; it is fixed by keeping arg a(0), i.e. the sum
-// of arg alpha_j, constant (the normalisation a(0) = 1 of the paper). The lattice of periods of zeta
-// then moves as Gamma(t) = Gamma(0) / z(t).
+//   ell(alpha(t)) = z(t) ell(alpha(0)),  z(t) in C^*.
+// We solve this with z as an unknown (no division by a component of ell), plus the gauge
+// sum_j arg alpha_j = const, which fixes the rotation alpha -> e^{i phi} alpha (the paper's
+// normalisation a(0) = 1): 2g+1 real equations in the 2g+2 unknowns (alpha, z), a curve.
+// The lattice of periods of zeta moves as Gamma(t) = Gamma(0) / z(t).
+//
+// Continuation: predictor along the tangent, chord Newton on the pseudo-arclength system with the
+// Jacobian of the step's start point (forward differences in alpha; the z-columns are exact).
+// The parameter s is pseudo-arclength in alpha-space (arclength to O(h^3) per step).
+//
+// The Willmore functional of the paper, W = 2i Res_{lam=0} q_{b2} Theta_{b1} for the parallel frame
+// b_k = p_{w_k / z} (w_1 = 1, w_2 = i at the anchor), becomes with lam = kappa^2 and
+// Theta_b = 2 b(kappa^2) / (kappa^2 sqrt(a(kappa^2))) dkappa:
+//   W = 8i (b_0^{(1)} b_1^{(2)} - b_0^{(2)} b_1^{(1)}) / a_0,
+// where b_0, b_1 are the coefficients of 1 and lam (the a_1 terms cancel). It is real, and its
+// critical points along the curve are where B_a has a common root.
 
-import { basicPeriods, periodVector } from './periods.js';
+import { basicPeriods, periodVector, thetaPoly } from './periods.js';
+import { aPoly } from './cmc.js';
 
 const M = 96; // quadrature points per cycle (the segment rule has converged far beyond 1e-12 here)
 
@@ -26,124 +38,138 @@ export function ellVector(alphas, ref = null) {
   });
 }
 
-const toX = (alphas) => alphas.flat();
 const toAlphas = (x) => Array.from({ length: x.length / 2 }, (_, j) => [x[2 * j], x[2 * j + 1]]);
 const wrap = (t) => t - 2 * Math.PI * Math.round(t / (2 * Math.PI));
+const cmul = ([ar, ai], [br, bi]) => [ar * br - ai * bi, ar * bi + ai * br];
 const cdiv = ([ar, ai], [br, bi]) => { const d = br * br + bi * bi; return [(ar * br + ai * bi) / d, (ai * br - ar * bi) / d]; };
+const dot = (a, b) => a.reduce((acc, v, i) => acc + v * b[i], 0);
 
 /**
- * The Whitham curve through given spectral data, parametrised by (pseudo-)arclength s in alpha-space.
- * at(s) continues the curve from the anchor to s (caching what it has computed) and returns
- * { alphas, z, s } where s may fall short of the request if the curve leaves the allowed region.
+ * The Whitham curve through given spectral data.
+ * at(s) continues the curve from the anchor to s (caching) and returns { alphas, z, s }, with s short
+ * of the request if the curve leaves the allowed region. trace() returns both branches for drawing.
  */
 export class WhithamCurve {
-  constructor(alphas, { h = 0.01 } = {}) {
+  constructor(alphas, { h = 0.05 } = {}) {
     this.g = alphas.length;
     if (this.g < 2) throw new Error('Whitham deformations need genus >= 2');
     this.h = h;
-    this.x0 = toX(alphas);
     this.arg0 = alphas.map(([re, im]) => Math.atan2(im, re));
     this.ell0 = ellVector(alphas);
-    // divide by the largest component to form the ratios
-    let k = 0;
-    this.ell0.forEach((l, j) => { if (Math.hypot(...l) > Math.hypot(...this.ell0[k])) k = j; });
-    this.k = k;
-    this.r0 = this.ell0.map((l) => cdiv(l, this.ell0[k]));
-    const t0 = this.nullVector(this.jacobian(this.x0, this.ell0));
-    if (t0[0] < 0) for (let i = 0; i < t0.length; i++) t0[i] = -t0[i];
-    const start = { s: 0, x: this.x0, t: t0, ell: this.ell0 };
+    const y0 = [...alphas.flat(), 1, 0];
+    const J = this.jacobian(y0, this.ell0);
+    let t = this.tangent(J);
+    if (t[0] < 0) t = t.map((v) => -v);
+    const start = { s: 0, y: y0, t, J, ell: this.ell0 };
     // both branches share the tangent; the sign of the step picks the direction
     this.branch = { 1: [start], [-1]: [{ ...start }] };
   }
 
-  /** The defining equations G(x) = 0 (2g-1 of them) and the ell vector at x. */
-  equations(x, ref) {
-    const alphas = toAlphas(x);
+  /** G(y) for y = (alpha as reals, zr, zi): the 2g real parts of ell - z ell0, then the gauge. */
+  equations(y, ref) {
+    const n = 2 * this.g;
+    const alphas = toAlphas(y.slice(0, n));
     const ell = ellVector(alphas, ref);
+    const z = [y[n], y[n + 1]];
     const G = [];
-    ell.forEach((l, j) => {
-      if (j === this.k) return;
-      const r = cdiv(l, ell[this.k]);
-      G.push(r[0] - this.r0[j][0], r[1] - this.r0[j][1]);
-    });
+    ell.forEach((l, j) => { const zl = cmul(z, this.ell0[j]); G.push(l[0] - zl[0], l[1] - zl[1]); });
     let gauge = 0;
     alphas.forEach(([re, im], j) => { gauge += wrap(Math.atan2(im, re) - this.arg0[j]); });
     G.push(gauge);
     return { G, ell };
   }
 
-  jacobian(x, ref) {
-    const { G } = this.equations(x, ref);
-    const eps = 1e-6;
-    const J = G.map(() => new Array(x.length).fill(0));
-    for (let i = 0; i < x.length; i++) {
-      const xp = x.slice(); xp[i] += eps;
-      const xm = x.slice(); xm[i] -= eps;
-      const Gp = this.equations(xp, ref).G, Gm = this.equations(xm, ref).G;
-      for (let r = 0; r < G.length; r++) J[r][i] = (Gp[r] - Gm[r]) / (2 * eps);
+  /** Jacobian of G at y: forward differences in alpha, exact in z. */
+  jacobian(y, ref) {
+    const n = 2 * this.g;
+    const G0 = this.equations(y, ref).G;
+    const J = G0.map(() => new Array(n + 2).fill(0));
+    const eps = 1e-7;
+    for (let i = 0; i < n; i++) {
+      const yp = y.slice(); yp[i] += eps;
+      const Gp = this.equations(yp, ref).G;
+      for (let r = 0; r < G0.length; r++) J[r][i] = (Gp[r] - G0[r]) / eps;
     }
+    this.ell0.forEach((l, j) => {
+      J[2 * j][n] = -l[0]; J[2 * j + 1][n] = -l[1];         // d/dzr of -(z ell0)
+      J[2 * j][n + 1] = l[1]; J[2 * j + 1][n + 1] = -l[0];  // d/dzi
+    });
     return J;
   }
 
-  /** Unit vector orthogonal to the rows of J (J has one row fewer than columns). */
-  nullVector(J) {
-    const n = J[0].length;
+  /** Null vector of J (one row fewer than columns), scaled to unit length in alpha. */
+  tangent(J) {
+    const m = J[0].length, n = 2 * this.g;
     const rows = [];
     for (const r of J) { // Gram–Schmidt on the rows
       const v = r.slice();
-      for (const q of rows) { const d = dot(v, q); for (let i = 0; i < n; i++) v[i] -= d * q[i]; }
+      for (const q of rows) { const d = dot(v, q); for (let i = 0; i < m; i++) v[i] -= d * q[i]; }
       const nv = Math.hypot(...v);
       if (nv > 1e-12) rows.push(v.map((c) => c / nv));
     }
     let best = null, bn = -1;
-    for (let k = 0; k < n; k++) {
-      const v = new Array(n).fill(0); v[k] = 1;
-      for (const q of rows) { const d = dot(v, q); for (let i = 0; i < n; i++) v[i] -= d * q[i]; }
+    for (let k = 0; k < m; k++) {
+      const v = new Array(m).fill(0); v[k] = 1;
+      for (const q of rows) { const d = dot(v, q); for (let i = 0; i < m; i++) v[i] -= d * q[i]; }
       const nv = Math.hypot(...v);
-      if (nv > bn) { bn = nv; best = v.map((c) => c / nv); }
+      if (nv > bn) { bn = nv; best = v; }
     }
-    return best;
+    const na = Math.hypot(...best.slice(0, n));
+    return best.map((c) => c / na);
   }
 
-  /** One predictor–corrector step of length h from point p along its tangent. Null if it fails. */
-  step(p, h) {
-    const n = p.x.length;
-    const xp = p.x.map((v, i) => v + h * p.t[i]);
-    let x = xp.slice(), ell = p.ell;
-    for (let it = 0; it < 12; it++) {
-      const eq = this.equations(x, ell);
+  /** One predictor–corrector step of alpha-arclength h from point p, to residual tol. Null if it fails. */
+  step(p, h, tol = 1e-11) {
+    const n = 2 * this.g, m = n + 2;
+    const yp = p.y.map((v, i) => v + h * p.t[i]);
+    const y = yp.slice();
+    let ell = p.ell, res = Infinity;
+    // pseudo-arclength in alpha: the correction stays in the hyperplane t_alpha . (y - yp) = 0,
+    // so s advances by exactly h (= alpha-arclength to O(h^3))
+    const ta = p.t.map((v, i) => (i < n ? v : 0));
+    const A = [...p.J, ta]; // chord Newton: the start point's Jacobian throughout
+    for (let it = 0; it < 30; it++) {
+      const eq = this.equations(y, ell);
       ell = eq.ell;
-      const res = Math.hypot(...eq.G);
-      const J = this.jacobian(x, ell);
-      // augmented system: G = 0 and t . (x - xp) = 0
-      const A = [...J, p.t.slice()], b = [...eq.G.map((v) => -v), -dot(p.t, x.map((v, i) => v - xp[i]))];
-      const dx = solve(A, b, n);
-      if (!dx.every(Number.isFinite)) return null;
-      for (let i = 0; i < n; i++) x[i] += dx[i];
-      if (res < 1e-12 && Math.hypot(...dx) < 1e-12) break;
-      if (it === 11 && res > 1e-8) return null;
+      res = Math.hypot(...eq.G);
+      const b = [...eq.G.map((v) => -v), -dot(ta, y.map((v, i) => v - yp[i]))];
+      const dy = solve(A, b, m);
+      if (!dy.every(Number.isFinite)) return null;
+      for (let i = 0; i < m; i++) y[i] += dy[i];
+      if (Math.hypot(...dy) < tol && res < tol) break;
     }
-    const alphas = toAlphas(x);
+    if (!(res < Math.max(1e-9, 10 * tol))) return null;
+    const alphas = toAlphas(y.slice(0, n));
     const bad = alphas.some(([re, im]) => { const r = Math.hypot(re, im); return r < 0.02 || r > 0.98; })
-      || alphas.some((a, i) => alphas.some((b, j) => j > i && Math.hypot(a[0] - b[0], a[1] - b[1]) < 2e-3));
+      || alphas.some((a, i) => alphas.some((c, j) => j > i && Math.hypot(a[0] - c[0], a[1] - c[1]) < 2e-3));
     if (bad) return null;
-    const eq = this.equations(x, ell);
-    if (Math.hypot(...eq.G) > 1e-8) return null;
-    let t = this.nullVector(this.jacobian(x, eq.ell));
+    const J = this.jacobian(y, ell);
+    let t = this.tangent(J);
     if (dot(t, p.t) < 0) t = t.map((v) => -v);
-    return { s: p.s + Math.sign(h) * Math.hypot(...x.map((v, i) => v - p.x[i])), x, t, ell: eq.ell };
+    return { s: p.s + h, y, t, J, ell };
+  }
+
+  /**
+   * Extend branch dir (±1) until |s| >= smax or maxSteps; step length adapts on failure. Points are
+   * computed to residual tol; a coarse branch (for drawing) is kept apart from the accurate one.
+   */
+  extend(dir, smax, maxSteps = Infinity, tol = 1e-11) {
+    const key = tol < 1e-10 ? dir : `${dir}coarse`;
+    if (!this.branch[key]) this.branch[key] = [{ ...this.branch[1][0] }];
+    const pts = this.branch[key];
+    let h = this.h, steps = 0;
+    while (!pts.done && dir * pts[pts.length - 1].s < smax && steps < maxSteps) {
+      const q = this.step(pts[pts.length - 1], dir * h, tol);
+      if (q) { pts.push(q); steps++; h = Math.min(this.h, h * 1.5); }
+      else if (h > this.h / 64) h /= 4;
+      else pts.done = true;
+    }
+    return pts;
   }
 
   at(s) {
     const dir = s >= 0 ? 1 : -1;
-    const pts = this.branch[dir];
-    // continue until we pass s
-    while (dir * pts[pts.length - 1].s < dir * s && !pts.done) {
-      const q = this.step(pts[pts.length - 1], dir * this.h);
-      if (!q) { pts.done = true; break; }
-      pts.push(q);
-    }
-    // the last cached point not beyond s, then a partial step onto s
+    const pts = this.extend(dir, dir * s);
     let i = pts.length - 1;
     while (i > 0 && dir * pts[i].s > dir * s) i--;
     let p = pts[i];
@@ -151,12 +177,42 @@ export class WhithamCurve {
       const q = this.step(p, s - p.s);
       if (q) p = q;
     }
-    const z = cdiv(p.ell[this.k], this.ell0[this.k]);
-    return { alphas: toAlphas(p.x), z, s: p.s };
+    return this.describe(p);
+  }
+
+  describe(p) {
+    const n = 2 * this.g;
+    return { alphas: toAlphas(p.y.slice(0, n)), z: [p.y[n], p.y[n + 1]], s: p.s };
+  }
+
+  /** The Willmore functional at a point of the curve, in the frame parallel to (1, i) at the anchor. */
+  willmore({ alphas, z }) {
+    const P = basicPeriods(alphas, M);
+    const b1 = thetaPoly(alphas, cdiv([1, 0], z), P), b2 = thetaPoly(alphas, cdiv([0, 1], z), P);
+    const a = aPoly(alphas);
+    const d = [cmul(b1[0], b2[1])[0] - cmul(b2[0], b1[1])[0], cmul(b1[0], b2[1])[1] - cmul(b2[0], b1[1])[1]];
+    const W = cmul([0, 8], cdiv(d, [a[0], a[1]]));
+    return W; // [re, im]; im vanishes up to quadrature error
+  }
+
+  /**
+   * Both branches up to |s| <= smax (at most maxSteps each), as [{ s, alphas, z, W }] sorted by s,
+   * plus the critical points of W (sign changes of its differences).
+   */
+  trace(smax = 1.5, maxSteps = 80, tol = 1e-8) {
+    const neg = this.extend(-1, smax, maxSteps, tol), pos = this.extend(1, smax, maxSteps, tol);
+    const pts = [...neg.slice(1).reverse(), ...pos].map((p) => {
+      const d = this.describe(p);
+      return { ...d, W: this.willmore(d)[0] };
+    });
+    const critical = [];
+    for (let i = 1; i + 1 < pts.length; i++) {
+      const a = pts[i].W - pts[i - 1].W, b = pts[i + 1].W - pts[i].W;
+      if (a * b < 0) critical.push(i);
+    }
+    return { points: pts, critical, ends: { neg: !!neg.done, pos: !!pos.done } };
   }
 }
-
-const dot = (a, b) => a.reduce((acc, v, i) => acc + v * b[i], 0);
 
 function solve(A, b, n) {
   const Mx = A.map((r, i) => [...r, b[i]]);

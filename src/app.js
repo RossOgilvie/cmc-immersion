@@ -200,6 +200,7 @@ function onResult(e) {
 /** Called after every state change. dragging: more changes are coming, so only preview. */
 function changed(dragging = false) {
   whithamCheckAnchor();
+  requestFamily();
   request(false);
   clearTimeout(fullTimer);
   fullTimer = setTimeout(() => request(true), dragging || anim ? 350 : 0);
@@ -447,6 +448,7 @@ function whithamCheckAnchor() {
   if (whitham.key !== null && whitham.key !== JSON.stringify(state.alphas)) whithamRecentre();
 }
 function whithamRecentre() {
+  family.key = null; // the family's s = 0 moves here: retrace
   whitham.curve = null;
   whitham.s = 0;
   whitham.key = null;
@@ -459,9 +461,60 @@ function whithamNote() {
   $('whithamBox').querySelectorAll('input, button').forEach((el) => { el.disabled = g < 2; });
   if (g < 2) { $('whithamNote').textContent = 'Needs genus ≥ 2.'; return; }
   const zr = Math.hypot(...whitham.z), za = Math.atan2(whitham.z[1], whitham.z[0]);
-  $('whithamNote').textContent = whitham.s === 0 && !whitham.curve
+  const parts = [whitham.s === 0 && !whitham.curve
     ? 'Moves the branch points keeping the conformal type of the period lattice.'
-    : `lattice scaled by 1/|z| = ${fmt(1 / zr, 4)}` + (Math.abs(za) > 1e-6 ? `, turned by ${fmt(-za, 4)}` : '');
+    : `lattice scaled by 1/|z| = ${fmt(1 / zr, 4)}` + (Math.abs(za) > 1e-6 ? `, turned by ${fmt(-za, 4)}` : '')];
+  const F = family.data;
+  if (F && F.points.length > 1) {
+    const Ws = F.points.map((p) => p.W);
+    // W at the current point: on the family, interpolated in s
+    const P = F.points, s = whitham.s;
+    let i = 1;
+    while (i < P.length - 1 && P[i].s < s) i++;
+    const f = P[i].s > P[i - 1].s ? Math.min(1, Math.max(0, (s - P[i - 1].s) / (P[i].s - P[i - 1].s))) : 0;
+    const Wnow = P[i - 1].W + f * (P[i].W - P[i - 1].W);
+    parts.push(`𝒲 = ${fmt(Wnow, 4)} (family: ${fmt(Math.min(...Ws), 3)} … ${fmt(Math.max(...Ws), 3)})`
+      + (F.critical.length ? `; 𝒲 critical at s = ${F.critical.map((c) => fmt(P[c].s, 3)).join(', ')}` : ''));
+  }
+  $('whithamNote').textContent = parts.join(' · ');
+}
+
+// the family (Whitham curve through the current data) for the λ-plane, traced in its own worker so it
+// never delays the surface; the latest request wins. Moving along the curve with the slider doesn't
+// change the family, so only other edits of the spectral data (or recentring) trigger a new trace.
+const family = { worker: null, busy: false, pending: null, key: null, data: null };
+function requestFamily() {
+  if (!$('showFamily').checked || genus() < 2) {
+    family.pending = null;
+    if (family.data) { family.data = null; family.key = null; widget.set({ family: null }); }
+    return;
+  }
+  const key = JSON.stringify(state.alphas);
+  if (key === family.key || (family.data && key === whitham.key)) return;
+  family.key = key;
+  family.pending = { key, alphas: state.alphas.map((a) => a.slice()) };
+  pumpFamily();
+}
+function pumpFamily() {
+  if (family.busy || !family.pending) return;
+  if (!family.worker) {
+    family.worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+    family.worker.onmessage = (e) => {
+      family.busy = false;
+      const { result, error } = e.data;
+      // show every result, even if a newer request is queued: during a drag that keeps the paths live
+      if ($('showFamily').checked && genus() >= 2) {
+        family.data = error ? null : result;
+        widget.set({ family: family.data });
+        whithamNote();
+      }
+      pumpFamily();
+    };
+  }
+  const job = family.pending;
+  family.pending = null;
+  family.busy = true;
+  family.worker.postMessage({ id: 0, kind: 'family', params: { alphas: job.alphas, smax: 1.5, maxSteps: 80 } });
 }
 function whithamMove(s) {
   if (genus() < 2) return s;
@@ -508,7 +561,8 @@ const whithamSlider = slider($('whithamRow'), {
   set: (v) => { whithamMove(v); },
   play: { key: 'whitham' },
 });
-$('whithamReset').addEventListener('click', () => { whithamRecentre(); });
+$('whithamReset').addEventListener('click', () => { whithamRecentre(); requestFamily(); });
+$('showFamily').addEventListener('change', () => { family.key = null; requestFamily(); whithamNote(); });
 $('whithamDomain').addEventListener('change', () => { if (whitham.curve) { whithamMove(whitham.s); changed(false); } });
 
 // ------------------------------------------------------------------ closing up
