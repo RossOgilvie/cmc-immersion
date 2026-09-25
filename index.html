@@ -178,7 +178,9 @@
   #closeInfo { display: block; }
 
   .help p { margin: 4px 0 6px; font-size: 15.5px; font-style: italic; color: var(--muted); }
-  .about p { font-size: 15.5px; margin: 6px 0; }
+  .more { text-decoration: none; font-variant-caps: all-small-caps; letter-spacing: 0.09em; }
+  .more:hover { color: var(--accent); }
+  .more .arr { font-variant-caps: normal; letter-spacing: 0; }
 
   @media (max-width: 840px) {
     html, body { height: auto; min-height: 100%; }
@@ -329,16 +331,7 @@
   </section>
 
   <section class="sec about">
-    <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="bodyAbout"><span class="chev" data-glyph="chev"></span>About</button></h2>
-    <div class="secbody" id="bodyAbout" hidden>
-      <p>The spectral curve is ν² = λ a(λ) with a(λ) = −∏(λ − αᵢ)(1 − ᾱᵢλ), of genus g = number of branch points αᵢ. A polynomial Killing field ζ(λ) with −det ζ = a/λ is integrated along the z-plane together with the extended frame F and ∂<sub>λ</sub>F at the Sym point λ₀. The Sym–Bobenko formula f = 4 ∂<sub>θ</sub>F F⁻¹ then gives the immersion with H = ½ and metric 4e²ᵘ|dz|²; the H slider rescales it by 1/(2H). Angles are given in units of π.</p>
-      <p>Genus 1: the dashed diameter through λ₀ is where the surface closes into a Delaunay cylinder (unduloid on the far side, nodoid on the near side); branch points snap onto it. A double branch point α₁ = α₂ = λ₀(k − √(k²−1))², k ≥ 2 (a resonance point of the cylinder) gives a k-lobed bubbleton; <i>close up</i> finds the periods of whatever is on screen.</p>
-      <p>Moving λ₀ alone traverses the associated family. For g ≥ 3 the sliders move along the isospectral torus. For g ≤ 2 every isospectral deformation is a translation of the domain. Periods and closing conditions are not imposed: these are immersed planes, which close up into cylinders or tori only for special data.</p>
-      <p>Whitham deformation (Hasse–Ogilvie–Schmidt): the branch points move so that the plane of periods of the differentials Θ with purely imaginary periods, together with its complex structure, stays fixed; equivalently the lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales by 1/z. The rotation freedom is fixed by keeping arg a(0), so λ₀ and the curvature directions stay put. Closing conditions in R³ are not preserved.</p>
-      <p>The slider shows the Willmore functional 𝒲 = 2i Res<sub>λ=0</sub> q<sub>b₂</sub>Θ<sub>b₁</sub> of the paper (in the frame fixed where the slider was last recentred); click the value to enter one. The slider spans the whole family: its ends are where the flow meets an obstacle, a branch point reaching 0 or the unit circle (or two colliding). With <i>show the family</i> on, the λ-plane shows the path of every branch point along the Whitham curve through the current data, coloured by 𝒲 (blue low, rust high). A tick across the paths, and on the slider, marks critical points of 𝒲, which are where the differentials have a common root, as for tori; the slider snaps onto it. <i>Flow to common root</i> moves there and puts λ₀ on the common root, which switches on the root-preserving flow.</p>
-      <p>Root-preserving flow (Carberry–Kilian–Klein–Schmidt): when λ₀ is a common root of the differentials Θ (the data lie on S<sup>g</sup>), the branch points can move keeping the periods of Θ and the common root at λ₀. For genus 2 this flow is two-dimensional, and its coordinates are the Sym integrals φ₁, φ₂: half the integrals of the two differentials with B-periods 2πi, once around the unit circle from λ₀. They fill the triangle φ₁ + φ₂ &lt; π; the dashed diagonal is the Wente family, and where φ is a rational multiple of π in both coordinates the surface closes into a torus (the pad snaps to these points with denominator up to 6). Drag the dot to move along the flow; hold alt to avoid snapping. The period lattice shrinks like √|α| towards the corner φ = 0 (both branch points → 0), and the domain is carried along with it; there the conformal factor develops sharp bubbles, which are integrated with error-controlled steps (the status line then says <i>adaptive steps</i>).</p>
-      <p>Method: Pinkall–Sterling (1989); Bobenko (1991); conventions of Kilian–Schmidt and Burstall–Ferus–Pedit–Pinkall. See <span style="font-family:monospace">cmc_spectral_to_immersion.md</span>. Type: EB Garamond (SIL Open Font License).</p>
-    </div>
+    <h2 class="sech"><a class="disc more" href="about.html" target="_blank" rel="noopener" title="How the surfaces are computed, in a new tab">Learn more<span class="arr" aria-hidden="true">→</span></a></h2>
   </section>
 </aside>
 

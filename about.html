@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the Surfaces Are Made</title>
+<meta name="description" content="How the CMC viewer turns spectral data into a surface of constant mean curvature: the spectral curve, polynomial Killing fields, the Sym–Bobenko formula, closing conditions and Whitham flows.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/fonts/eb-garamond.css">
+<link rel="stylesheet" href="vendor/temml/temml.css">
+<style>
+  :root {
+    --paper: #F2EEE3; --hover: #E8E2D3; --shade: #EAE4D6; --ink: #27231E; --muted: #6A6257; --rule: #CFC5B0;
+    --accent: #9E3F24; --blue: #3D5A80;
+    --serif: 'EB Garamond', Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+  }
+  html { background: var(--paper); scroll-padding-top: 24px; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink); font-family: var(--serif);
+    font-size: 19.5px; line-height: 1.55; font-variant-numeric: lining-nums;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { text-decoration-thickness: 2px; }
+  main { max-width: 700px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* masthead */
+  .back { font-size: 16px; font-variant-caps: all-small-caps; letter-spacing: 0.09em; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  h1 {
+    font-size: 36px; font-weight: 500; font-variant-caps: all-small-caps; letter-spacing: 0.07em;
+    line-height: 1.15; margin: 26px 0 6px;
+  }
+  .lede { font-size: 21px; font-style: italic; color: var(--muted); margin: 0 0 28px; line-height: 1.45; }
+
+  /* sections: small-caps header with a hairline, as in the viewer's panel */
+  h2 {
+    display: flex; align-items: baseline; gap: 14px; font-size: 22px; font-weight: 500; margin: 56px 0 14px;
+    font-variant-caps: all-small-caps; letter-spacing: 0.08em;
+  }
+  h2::after { content: ''; flex: 1; height: 1px; background: var(--rule); transform: translateY(-5px); }
+  h2 .n { color: var(--muted); font-variant-numeric: lining-nums tabular-nums; }
+  h3 { font-size: 19.5px; font-weight: 500; font-style: italic; margin: 28px 0 6px; }
+  p { margin: 0 0 14px; hyphens: auto; }
+  ul, ol { padding-left: 1.4em; margin: 0 0 14px; }
+  li { margin: 0 0 6px; }
+  li::marker { color: var(--muted); }
+  ol.steps { counter-reset: step; list-style: none; padding: 0; }
+  ol.steps > li { counter-increment: step; position: relative; padding-left: 2.1em; margin-bottom: 12px; }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0; width: 1.5em; text-align: right;
+    font-variant-caps: all-small-caps; color: var(--muted); font-size: 22px; line-height: 1.3;
+  }
+  b, strong { font-weight: 600; }
+  .muted { color: var(--muted); }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 40px 0; }
+
+  /* "In the viewer" notes */
+  .viewer {
+    border-left: 1px solid var(--rule); padding: 2px 0 2px 16px; margin: 18px 0 20px; font-size: 17.5px;
+    color: var(--muted); font-style: italic;
+  }
+  .viewer::before {
+    content: 'In the viewer'; display: block; font-style: normal; font-variant-caps: all-small-caps;
+    letter-spacing: 0.09em; color: var(--ink); font-size: 16px; margin-bottom: 2px;
+  }
+  .viewer i, .viewer em { font-style: normal; }
+  .viewer math { color: var(--ink); }
+
+  /* maths */
+  math { font-size: 1.02em; }
+  math.tml-display { margin: 14px 0 16px; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  /* a display with several parts: one row where it fits, stacked where it doesn't */
+  .eqs { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 2.2em; margin: 14px 0 16px; }
+  .eqs math.tml-display { display: inline-block; width: auto; margin: 2px 0; }
+
+  /* figures */
+  figure { margin: 26px 0 28px; }
+  figcaption { font-size: 16.5px; font-style: italic; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figure.lam svg { max-width: 400px; margin: 0 auto; }
+  .gallery { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 8px 0 6px; }
+  .gallery a { display: block; text-decoration: none; color: var(--muted); font-size: 15.5px; font-style: italic; line-height: 1.3; }
+  .gallery img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--rule); margin-bottom: 5px; }
+  .gallery a:hover img { border-color: var(--accent); }
+  .gallery a:hover span { color: var(--accent); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+
+  /* contents */
+  nav.toc { font-size: 16.5px; line-height: 1.45; margin: 0 0 8px; }
+  nav.toc .h { font-variant-caps: all-small-caps; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 4px; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 28px; }
+  nav.toc li { margin: 0 0 3px; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc .n { color: var(--muted); display: inline-block; width: 1.6em; font-variant-numeric: tabular-nums; }
+  @media (min-width: 1200px) {
+    nav.toc { position: fixed; top: 110px; left: calc(50% - 350px - 250px); width: 210px; }
+    nav.toc ol { columns: 1; }
+    nav.toc a.on { color: var(--accent); }
+  }
+
+  .refs li { margin-bottom: 9px; font-size: 17.5px; }
+  .refs i { font-style: italic; }
+  footer { font-size: 15.5px; font-style: italic; color: var(--muted); margin-top: 48px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 18px; }
+    h1 { font-size: 30px; }
+    .lede { font-size: 19px; }
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+    .pair { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="index.html">← The viewer</a>
+  <h1>CMC Surfaces from Spectral Data</h1>
+  <p class="lede">How the viewer turns a few points in a disc into a surface of constant mean curvature: the spectral curve, the polynomial Killing field, the frame and the Sym–Bobenko formula, and the flows that move between tori.</p>
+
+  <div class="gallery">
+    <a href="index.html#a=0.45,0&amp;l=3.14159265&amp;d=2.90682,14"><img src="img/unduloid.webp" alt="An unduloid" loading="lazy"><span>An unduloid, genus 1</span></a>
+    <a href="index.html#a=0.0294372515,0;0.0294372515,0&amp;l=0&amp;d=3.14159265,1.6&amp;g=0.05236&amp;h=0.02&amp;r=512"><img src="img/bubbleton.webp" alt="A three-lobed bubbleton, drawn transparent" loading="lazy"><span>A three-lobed bubbleton</span></a>
+    <a href="index.html#a=0.1412634686,0.1017768953;0.1412634686,-0.1017768953&amp;l=0&amp;d=6.950948617,2.239937825&amp;g=0.09654&amp;r=360"><img src="img/wente.webp" alt="The three-lobed Wente torus" loading="lazy"><span>The Wente torus, genus 2</span></a>
+    <a href="index.html#a=0.501479,0.200297;0,0.4;-0.496995,-0.298991;0.198653,-0.59786&amp;l=1&amp;t=0.8,-0.5&amp;d=6,6"><img src="img/genus4.webp" alt="A plane of spectral genus 4" loading="lazy"><span>A plane of genus 4</span></a>
+  </div>
+  <p class="muted" style="font-size:16px;font-style:italic;margin-bottom:30px">Each picture opens in the viewer.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <div class="h">Contents</div>
+    <ol>
+      <li><a href="#overview"><span class="n">1</span>The idea in brief</a></li>
+      <li><a href="#cmc"><span class="n">2</span>Constant mean curvature</a></li>
+      <li><a href="#spectral"><span class="n">3</span>Spectral data</a></li>
+      <li><a href="#killing"><span class="n">4</span>Polynomial Killing fields</a></li>
+      <li><a href="#start"><span class="n">5</span>A first Killing field</a></li>
+      <li><a href="#iso"><span class="n">6</span>The isospectral torus</a></li>
+      <li><a href="#sym"><span class="n">7</span>Frame and Sym formula</a></li>
+      <li><a href="#numerics"><span class="n">8</span>Numerics</a></li>
+      <li><a href="#closing"><span class="n">9</span>Cylinders and tori</a></li>
+      <li><a href="#whitham"><span class="n">10</span>Whitham deformations</a></li>
+      <li><a href="#rootflow"><span class="n">11</span>The root-preserving flow</a></li>
+      <li><a href="#edges"><span class="n">12</span>At the edges of the disc</a></li>
+      <li><a href="#refs"><span class="n">13</span>References</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================ -->
+  <h2 id="overview"><span class="n">1</span>The idea in brief</h2>
+
+  <p>A surface in $\mathbb R^3$ with constant mean curvature (CMC) is, in conformal coordinates, a solution of the sinh-Gordon equation with some extra data. That equation is <em>integrable</em>. Its solutions come in families depending on a complex number $\lambda$, the <em>spectral parameter</em>, and the solutions of <em>finite type</em> are described by an algebraic curve over the $\lambda$-plane. These include every CMC torus. The viewer starts from that curve and works back to the surface in four steps.</p>
+
+  <ol class="steps">
+    <li><b>Spectral data.</b> Choose $g$ branch points $\alpha_1,\dots,\alpha_g$ in the unit disc and a Sym point $\lambda_0$ on the unit circle. Together they define the spectral curve $\Sigma:\ \nu^2=\lambda\,a(\lambda)$ of genus $g$.</li>
+    <li><b>Killing field.</b> Write down, in closed form, a matrix polynomial $\zeta(\lambda)$ with $-\det\zeta = a(\lambda)/\lambda$. You can then move it around the isospectral torus: the set of all such $\zeta$ for the same curve.</li>
+    <li><b>Integration.</b> $\zeta$ determines a Lax pair $U,V$. The Lax equation $\zeta_z=[\zeta,U]$ and the frame equation $F_z=FU$ are ordinary differential equations along any path in the $z$-plane. Integrate them over a grid.</li>
+    <li><b>Surface.</b> The Sym–Bobenko formula $f=4\,(\partial_\theta F)F^{-1}\big|_{\lambda_0}$ gives the immersion. The Killing field also gives the conformal factor $u$, and from it the Gauss curvature and the principal curvatures.</li>
+  </ol>
+
+  <p>No theta functions or period matrices are needed, only ODEs. Periods enter only when we ask whether the plane closes up into a cylinder or a torus (<a href="#closing">§9</a>), and when we deform the curve through families of tori (<a href="#whitham">§10</a>, <a href="#rootflow">§11</a>).</p>
+
+  <!-- ============================================================ -->
+  <h2 id="cmc"><span class="n">2</span>Constant mean curvature</h2>
+
+  <p>Let $f:\Omega\subset\mathbb C\to\mathbb R^3$ be a conformal immersion with coordinate $z=x+iy$, unit normal $N$ and metric $4e^{2u}|dz|^2$. Its <em>Hopf differential</em> is $Q\,dz^2$ with $Q=\langle f_{zz},N\rangle$. The Codazzi equation says that the mean curvature is constant exactly when $Q$ is holomorphic. The surfaces here have no umbilics, so $Q$ never vanishes. On the planes built from spectral data it is in fact constant, and we scale $z$ so that $|Q|=1$.</p>
+
+  <p>Normalise the mean curvature to $H=\tfrac12$. The Gauss equation then becomes the elliptic sinh-Gordon equation</p>
+  <div class="eqs">$$u_{z\bar z}+\tfrac12\sinh 2u=0$$ $$\Longleftrightarrow$$ $$\Delta u+2\sinh 2u=0 .$$</div>
+  <p>Conversely, every solution $u$ together with a unimodular $Q$ gives a CMC immersion, unique up to a rigid motion. The curvatures follow from $u$:</p>
+  <div class="eqs">$$K=\tfrac14\big(1-e^{-4u}\big),$$ $$\kappa_\pm=\tfrac12\big(1\pm e^{-2u}\big).$$</div>
+  <p>So $K&lt;H^2=\tfrac14$ everywhere, and $K$ is large and negative where $u$ is large and negative.</p>
+
+  <p>Replace $Q$ by $\lambda^{-1}Q$ with $|\lambda|=1$. The Gauss and Codazzi equations still hold, so there is a circle of surfaces with the same metric, the <em>associated family</em>. That circle is where the spectral parameter comes from: the construction below produces a frame for every $\lambda$ at once, and $\lambda_0$ picks one member of the family.</p>
+
+  <div class="viewer">The <i>H</i> slider rescales the finished surface by $1/(2H)$. Nothing else changes. The <i>Texture</i> menu can colour the surface by $u$ or by $K$.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="spectral"><span class="n">3</span>Spectral data</h2>
+
+  <p>Take branch points $\alpha_1,\dots,\alpha_g$ with $0&lt;|\alpha_i|&lt;1$, and set</p>
+  <div class="eqs">$$a(\lambda)=-\prod_{i=1}^{g}(\lambda-\alpha_i)(1-\bar\alpha_i\lambda),$$ $$\deg a=2g .$$</div>
+  <p>Its roots are the $\alpha_i$ and their reflections $1/\bar\alpha_i$ in the unit circle. This reflection symmetry is the <em>reality condition</em>. On the circle,</p>
+  <div class="eqs">$$\lambda^{-g}a(\lambda)=-\prod_i|\lambda-\alpha_i|^2&lt;0$$ $$(|\lambda|=1).$$</div>
+  <p>The <em>spectral curve</em> is the hyperelliptic curve</p>
+  $$\Sigma:\quad \nu^2=\lambda\,a(\lambda).$$
+  <p>It has $2g+2$ branch points, $0$, $\infty$, the $\alpha_i$ and the $1/\bar\alpha_i$, so it has genus $g$. Along with the Sym point $\lambda_0$, only one more number is needed:</p>
+  $$\kappa_0=2\sqrt{|a(0)|}=2\prod_i|\alpha_i|^{1/2}.$$
+
+  <figure class="lam">
+    <svg viewBox="0 0 400 290" role="img" aria-label="The lambda-plane: the unit circle, two branch points inside with their reflections outside, the Sym point on the circle, and two cycles on the spectral curve">
+      <defs>
+        <marker id="ar" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1 7 4 1 7" fill="none" stroke="#6A6257" stroke-width="1.2"/></marker>
+      </defs>
+      <circle cx="190" cy="150" r="80" fill="#EAE4D6" stroke="#27231E" stroke-width="1.3"/>
+      <line x1="80" y1="150" x2="330" y2="150" stroke="#CFC5B0"/>
+      <line x1="190" y1="20" x2="190" y2="285" stroke="#CFC5B0"/>
+      <!-- B-cycle around {0, alpha_1}; A-cycle around {alpha_1, 1/conj(alpha_1)} -->
+      <ellipse cx="177.05" cy="167.8" rx="35" ry="11" transform="rotate(126 177.05 167.8)" fill="none" stroke="#6A6257" stroke-width="1" stroke-dasharray="4 3"/>
+      <ellipse cx="259.2" cy="91.7" rx="56" ry="12" transform="rotate(-40.1 259.2 91.7)" fill="none" stroke="#6A6257" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="196" y="190" font-family="EB Garamond, serif" font-style="italic" font-size="15" fill="#6A6257">B<tspan font-size="10" dy="3" font-style="normal">2</tspan></text>
+      <text x="276" y="112" font-family="EB Garamond, serif" font-style="italic" font-size="15" fill="#6A6257">A<tspan font-size="10" dy="3" font-style="normal">1</tspan></text>
+      <!-- 0 -->
+      <path d="M186 146l8 8M194 146l-8 8" stroke="#27231E" stroke-width="1.3"/>
+      <!-- alpha_1, alpha_2 and reflections -->
+      <circle cx="226.7" cy="119.1" r="4.5" fill="#27231E"/>
+      <circle cx="291.7" cy="64.3" r="4.5" fill="#F2EEE3" stroke="#27231E" stroke-width="1.3"/>
+      <circle cx="164.1" cy="185.6" r="4.5" fill="#27231E"/>
+      <circle cx="104.4" cy="267.6" r="4.5" fill="#F2EEE3" stroke="#27231E" stroke-width="1.3"/>
+      <!-- lambda_0 -->
+      <circle cx="265.9" cy="125.1" r="5" fill="#9E3F24"/>
+      <g font-family="EB Garamond, serif" font-size="16" fill="#27231E">
+        <text x="232" y="136" font-style="italic">α<tspan font-size="11" dy="3" font-style="normal">1</tspan></text>
+        <text x="300" y="60" font-style="italic">1/ᾱ<tspan font-size="11" dy="3" font-style="normal">1</tspan></text>
+        <text x="142" y="202" font-style="italic">α<tspan font-size="11" dy="3" font-style="normal">2</tspan></text>
+        <text x="112" y="285" font-style="italic">1/ᾱ<tspan font-size="11" dy="3" font-style="normal">2</tspan></text>
+        <text x="172" y="146">0</text>
+        <text x="274" y="138" font-style="italic" fill="#9E3F24">λ<tspan font-size="11" dy="3" font-style="normal">0</tspan></text>
+        <text x="96" y="92" font-style="italic" fill="#6A6257" font-size="15">|λ| = 1</text>
+      </g>
+    </svg>
+    <figcaption>The λ-plane for genus 2. The branch points α<sub>i</sub> (dots) lie inside the unit circle and their reflections 1/ᾱ<sub>i</sub> (rings) outside; 0 and ∞ are branch points too. The Sym point λ<sub>0</sub> lies on the circle. The dashed loops show the two kinds of cycle used for periods in §9: a B-cycle around {0, α<sub>2</sub>} and an A-cycle around {α<sub>1</sub>, 1/ᾱ<sub>1</sub>}.</figcaption>
+  </figure>
+
+  <p>Rotating all the $\alpha_i$ and $\lambda_0$ by a common phase gives the same surface, with the $z$-plane rotated, so one real parameter is redundant. The first few genera are familiar:</p>
+  <ul>
+    <li>$g=0$: $a\equiv-1$, and the surface is the round cylinder of radius 1 for every $\lambda_0$.</li>
+    <li>$g=1$: the surfaces of revolution (Delaunay's unduloids and nodoids) and their helicoidal relatives, the “twizzlers”. Here $u$ depends on one variable only.</li>
+    <li>$g\ge2$: genuinely two-dimensional solutions, among them Wente's tori at $g=2$.</li>
+  </ul>
+
+  <div class="viewer">The λ-plane in the panel shows exactly this picture, inside the unit circle. Drag a branch point or $\lambda_0$. Shift-drag turns everything together, which only rotates the $z$-plane. Double-click adds or removes a branch point, and <i>Genus</i> ± does the same. A <i>Branch points and Sym point</i> list lets you type exact values, with angles in units of π.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="killing"><span class="n">4</span>Polynomial Killing fields</h2>
+
+  <p>A <em>polynomial Killing field</em> for $\Sigma$ is a Laurent polynomial in $\lambda$ with values in $\mathfrak{sl}(2,\mathbb C)$,</p>
+  $$\zeta(\lambda)=\sum_{k=-1}^{g}\zeta_k\lambda^k=\begin{pmatrix}A&amp;B\\ C&amp;-A\end{pmatrix},$$
+  <p>with $A$ of degree $0,\dots,g-1$, $B$ of degree $-1,\dots,g-1$ and $C$ of degree $0,\dots,g$. It satisfies two conditions:</p>
+  <div class="eqs">$$\zeta_k=-\zeta_{g-1-k}^{\dagger}\quad(\text{reality}),$$ $$-\det\zeta=A^2+BC=\frac{a(\lambda)}{\lambda}\quad(\text{spectral curve}).$$</div>
+  <p>The reality condition says that $\lambda^{-(g-1)/2}\zeta$ takes values in $\mathfrak{su}(2)$ on the unit circle. The determinant condition says that the eigenvalues of $\zeta(\lambda)$ are $\pm\nu/\lambda$. So the points of $\Sigma$ over $\lambda$ are the eigenvalues of $\zeta(\lambda)$, and each point comes with an eigenline.</p>
+
+  <h3>The Lax pair</h3>
+  <p>The lowest two coefficients of $\zeta$ (and, by reality, the top two) determine a pair of $\lambda$-dependent matrices:</p>
+  <div class="eqs">$$U(\lambda)=\frac{1}{\kappa_0}\begin{pmatrix}\tfrac12A_0&amp;\lambda^{-1}B_{-1}\\ C_0&amp;-\tfrac12A_0\end{pmatrix},$$ $$V(\lambda)=\frac{1}{\kappa_0}\begin{pmatrix}\tfrac12A_{g-1}&amp;B_{g-1}\\ \lambda\,C_g&amp;-\tfrac12A_{g-1}\end{pmatrix}.$$</div>
+  <p>Here $V$ is the reflection of $U$: $V(\lambda)=-U(1/\bar\lambda)^\dagger$. The Killing field moves over the $z$-plane by the Lax equations</p>
+  <div class="eqs">$$\zeta_z=[\zeta,U],$$ $$\zeta_{\bar z}=[\zeta,V],$$ $$\text{or}$$ $$\zeta_x=[\zeta,U+V],\quad \zeta_y=[\zeta,\,i(U-V)].$$</div>
+  <p>These flows preserve the degree structure, the reality condition and $\det\zeta$, and they commute. This is the Adler–Kostant–Symes picture: the flows are linear on the Jacobian of $\Sigma$. They are compatible with the frame equation</p>
+  <div class="eqs">$$F_x=F\,(U+V),$$ $$F_y=F\,i(U-V),$$ $$F(0)=I .$$</div>
+  <p>Along any path, $\zeta(z,\lambda)=F(z,\lambda)^{-1}\,\zeta(0,\lambda)\,F(z,\lambda).$ Since $\zeta$ only changes by conjugation, its eigenvalues cannot change: the spectral curve is the same at every point of the plane.</p>
+  <p>The zero-curvature condition for $U$ and $V$ is the sinh-Gordon equation for</p>
+  <div class="eqs">$$e^{u}=\frac{2|B_{-1}|}{\kappa_0}$$ $$\big(\text{equivalently } e^{2u}=|B_{-1}/C_0|\big).$$</div>
+  <p>Only $\zeta_{-1},\zeta_0$ and their mirrors enter $U$ and $V$. The higher coefficients are what close the system. A solution admits such a polynomial Killing field precisely when it is of <em>finite type</em>, and every CMC torus is of finite type (Pinkall–Sterling, Hitchin).</p>
+
+  <!-- ============================================================ -->
+  <h2 id="start"><span class="n">5</span>A first Killing field</h2>
+
+  <p>To start the integration we need one $\zeta$ with the right determinant. Write $b(\lambda)=\lambda B(\lambda)$, a polynomial of degree $g$. Reality forces $C=-b^\sharp$, where $b^\sharp(\lambda)=\lambda^g\,\overline{b(1/\bar\lambda)}$ reverses and conjugates the coefficients. The determinant condition becomes a factorisation problem of Fejér–Riesz type:</p>
+  <div class="eqs">$$b\,b^\sharp=q,$$ $$q(\lambda):=\lambda A(\lambda)^2-a(\lambda).$$</div>
+  <p>Choose $A$, which is $g$ real parameters, small enough that $|A|\le\prod_i|\lambda-\alpha_i|$ on the unit circle. Then the roots of $q$ come in pairs $\rho_j$, $1/\bar\rho_j$, and $b=\beta\prod_j(\lambda-\rho_j)$ takes the roots inside the disc. The simplest choice, $A=0$, gives $q=-a$ and a Killing field in closed form:</p>
+  <div class="eqs">$$\zeta^{\rm base}=\begin{pmatrix}0&amp;\beta\lambda^{-1}\prod_j(\lambda-\alpha_j)\\[2pt] -\bar\beta\prod_j(1-\bar\alpha_j\lambda)&amp;0\end{pmatrix},$$ $$\beta=e^{-i\arg\prod_j(-\alpha_j)} .$$</div>
+  <p>The phase of $\beta$ is a gauge choice: it rotates the surface in space.</p>
+
+  <h3>The eigenline divisor</h3>
+  <p>A convenient label for a Killing field is the set of points of $\Sigma$ where its eigenline is $\mathbb C\,(0,1)^T$. These are the $g$ points</p>
+  <div class="eqs">$$D=\{(\mu_j,\nu_j)\},$$ $$b(\mu_j)=0,\quad \nu_j=-\mu_jA(\mu_j).$$</div>
+  <p>For $\zeta^{\rm base}$ the divisor is just $\{\alpha_j\}$. As $\zeta$ moves over the plane, its divisor moves over $\Sigma$, generally leaving the unit disc.</p>
+
+  <!-- ============================================================ -->
+  <h2 id="iso"><span class="n">6</span>The isospectral torus</h2>
+
+  <p>The Killing fields with a given spectral curve form a real $g$-dimensional torus, the real part of the Jacobian of $\Sigma$. Different points of it give different surfaces with the same spectral curve. The torus is swept out by a hierarchy of commuting flows, which extend the $x$- and $y$-flows. For $k\ge0$ and $c\in\mathbb C$, let $W_k$ be the "π-projection" of $\kappa_0^{-1}\lambda^{-k}\zeta$ (its negative powers and a triangular part of the constant term), and set</p>
+  <div class="eqs">$$G_{k,c}=c\,W_k+R(c\,W_k),$$ $$\frac{d\zeta}{dt}=[\zeta,G_{k,c}],$$</div>
+  <p>where $R(X)(\lambda)=-X(1/\bar\lambda)^\dagger$ is the reflection. The case $k=0$ gives back the $x$-flow ($c=1$) and the $y$-flow ($c=i$). The pairs $(k,1),(k,i)$ with $0\le k&lt;g/2$, plus $((g-1)/2,\,i)$ when $g$ is odd, give $g$ independent directions. The viewer reaches a point of the torus by flowing $\zeta^{\rm base}$ along each of them in turn, for times $\tau_1,\dots,\tau_g$. Since the flows commute, the order doesn't matter.</p>
+  <p>Two of these directions are the translations of the domain, so for $g\ge2$ only $g-2$ of the times change the shape of the surface. The times are not angles: the flows are linear on the torus but generically not periodic.</p>
+
+  <div class="viewer">The <i>Isospectral deformation</i> sliders are the $g-2$ shape times $\tau$. They are there from genus 3 on, since in genus 1 and 2 every isospectral deformation is a translation. <i>Show the eigenline divisor</i> draws the divisor at the centre of the domain as grey rings in the λ-plane.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="sym"><span class="n">7</span>The frame and the Sym–Bobenko formula</h2>
+
+  <p>For $|\lambda|=1$ the frame $F(z,\lambda)$ lies in $SU(2)$. Identify $\mathfrak{su}(2)$ with $\mathbb R^3$ by the orthonormal basis</p>
+  <div class="eqs">$$e_1=\begin{pmatrix}0&amp;i\\ i&amp;0\end{pmatrix},\quad e_2=\begin{pmatrix}0&amp;1\\ -1&amp;0\end{pmatrix},\quad e_3=\begin{pmatrix}i&amp;0\\ 0&amp;-i\end{pmatrix},$$ $$\langle X,Y\rangle=-\tfrac12\operatorname{tr}(XY).$$</div>
+  <p>With $\lambda=e^{i\theta}$, the Sym–Bobenko formula gives the immersion and its normal at the Sym point:</p>
+  <div class="eqs">$$f=4\,(\partial_\theta F)\,F^{-1}\big|_{\lambda_0}=4i\lambda_0\,G\,F^{-1},$$ $$N=-F\,e_3\,F^{-1},$$ $$G=\partial_\lambda F(\cdot,\lambda_0).$$</div>
+  <p>So the viewer never needs $F$ for other values of $\lambda$. It integrates $F$ and $G$ at $\lambda_0$ alongside $\zeta$. If $X$ is the generator of the step ($U+V$ for $x$-steps, $i(U-V)$ for $y$-steps), the system is</p>
+  <div class="eqs">$$\partial\zeta=[\zeta,X],$$ $$\partial F=F\,X(\lambda_0),$$ $$\partial G=G\,X(\lambda_0)+F\,X'(\lambda_0).$$</div>
+  <p>The initial values are $\zeta^{\rm init}$, $F=I$ and $G=0$. The result has $H=\tfrac12$ with respect to $N$, metric $4e^{2u}|dz|^2$, and Hopf differential</p>
+  $$Q=-\,e^{i\arg a(0)}/\lambda_0 .$$
+  <p>Because $Q$ is constant, the curvature lines in the $z$-plane are the straight lines in the directions $e^{i\phi}$ and $ie^{i\phi}$, with $\phi=-\tfrac12\arg Q$.</p>
+
+  <div class="viewer">Moving $\lambda_0$ alone walks through the associated family. The Killing field on the grid is unchanged, and only $F$ and $G$ are recomputed. The play button next to $\lambda_0$ animates it. With <i>Align grid with curvature lines</i> on, the grid is turned by $\phi$, so its lines are curvature lines.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="numerics"><span class="n">8</span>Numerics</h2>
+
+  <p>The whole computation is a set of small ODEs: $2(g+2)$ matrices for $\zeta$, plus two $2\times2$ matrices for $F$ and $G$. The flows commute, so the result at a grid point doesn't depend on the path taken to reach it. The viewer integrates along one horizontal line of the grid, then up and down each vertical line.</p>
+  <ul>
+    <li><b>Steps.</b> By default this is classical Runge–Kutta, with the step bounded by the <i>Accuracy</i> setting. Where the conformal factor varies over many orders of magnitude, fixed steps are wasteful: this happens near a branch point close to 0, as in bubbletons and the corner of <a href="#rootflow">§11</a>. There the viewer switches to an error-controlled Dormand–Prince 5(4) method with tolerance $10^{-9}$, and the status line says <i>adaptive steps</i>. The <i>Adaptive</i> accuracy option forces this.</li>
+    <li><b>Mesh.</b> While you drag, a coarse 72 × 72 preview is computed. Afterwards the full mesh is computed, with its rows and columns placed by the preview's metric so that they are dense where the surface is large. The work runs in a Web Worker, and a newer request always replaces a stale one.</li>
+    <li><b>Checks.</b> $\det\zeta=-a/\lambda$, the reality condition and $F\in SU(2)$ are invariants of the exact flow and serve as error checks. The formulas were checked in an independent Python implementation by finite differences on the mesh: $|f_x|=|f_y|=2e^u$, $f_x\perp f_y$, $H=\tfrac12$ and the sinh-Gordon equation. The JavaScript is tested against that implementation.</li>
+    <li><b>Scale.</b> $u$ is bounded on each surface but can be large when some $|\alpha_i|$ is small. So a fixed $z$-domain can give a very large or very small surface, and the view is framed by the bounding box.</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="closing"><span class="n">9</span>When does the plane close up?</h2>
+
+  <p>Every surface in the viewer is an immersed plane. It closes into a cylinder or a torus only for special data. Deciding which needs the periods of certain meromorphic differentials on $\Sigma$.</p>
+
+  <h3>The differentials Θ</h3>
+  <p>For a displacement $w\in\mathbb C$ in the $z$-plane, let $\Theta_w$ be the unique differential of the form</p>
+  <div class="eqs">$$\Theta_w=\frac{p_w(\lambda)\,d\lambda}{\lambda\,\nu},$$ $$\deg p_w\le g+1,$$</div>
+  <p>with double poles at $0$ and $\infty$ of the prescribed principal parts $d\big(\tfrac{w}{\kappa_0}\tfrac{\nu}{\lambda}\big)$ and $d\big(\tfrac{\bar w}{\kappa_0}\tfrac{\nu}{\lambda^g}\big)$, and with purely imaginary periods over every cycle. If $w$ is a period of the solution, then $\Theta_w=d\log\mu_w$, where $\mu_w$ is the eigenvalue of the monodromy</p>
+  $$M_w(\lambda)=F(z+w,\lambda)\,F(z,\lambda)^{-1}.$$
+  <p>The map $w\mapsto\Theta_w$ is real-linear, so everything is spanned by two differentials, with polynomials $p^{(1)}$ and $p^{(i)}$.</p>
+
+  <h3>The closing conditions</h3>
+  <ol>
+    <li><b>Intrinsic periods.</b> $w$ is a period of $u$ (and of $\zeta$) exactly when $\oint_\gamma\Theta_w\in2\pi i\,\mathbb Z$ for every cycle $\gamma$. These $w$ form a group $\Gamma$, and $u$ is doubly periodic when $\Gamma$ is a lattice.</li>
+    <li><b>Closing in $\mathbb R^3$.</b> For generators $w$ of $\Gamma$ we also need two things.
+      <ul>
+        <li>No translational period: $p_w(\lambda_0)=0$. By linearity, for a torus $\lambda_0$ must be a <em>common root</em> of $p^{(1)}$ and $p^{(i)}$ on the unit circle.</li>
+        <li>No rotational period: $\mu_w(\lambda_0)=\pm1$, where $\log\mu_w(\lambda_0)=\int_{\alpha_1}^{\lambda_0}\Theta_w$ modulo $\pi i$.</li>
+      </ul>
+    </li>
+  </ol>
+  <p>The periods are computed on the loops of the figure in §3, around $\{0,\alpha_j\}$ and around $\{\alpha_j,1/\bar\alpha_j\}$. The square root $\nu$ is tracked by continuity, and the quadrature is refined near the other branch points. Integrals along the unit circle use Gauss–Legendre panels graded towards the branch points close to it. The reality condition relates the two kinds of cycle. For even $g$ the conditions on the $g$ B-cycles are enough. For odd $g$ they are dependent, and all $2g$ cycles are used.</p>
+
+  <div class="viewer">A small rust diamond on the unit circle marks a common root of $p^{(1)},p^{(i)}$. $\lambda_0$ snaps onto it. <i>Close up</i> takes the periods along the grid directions and checks each by shooting: integrate $\zeta$, $F$ and $G$ from $0$ to $w$ and test $\zeta(w)=\zeta(0)$, $F(w)=\pm I$ and $f(w)=0$. It then trims the domain to one closed piece.</div>
+
+  <h3>Examples</h3>
+  <ul>
+    <li><b>Delaunay surfaces</b> ($g=1$). The surface closes into a surface of revolution when $\alpha$ lies on the diameter through $\lambda_0$. With $\alpha=re^{i\varphi}$, the choice $\lambda_0=-\alpha/|\alpha|$ gives an <em>unduloid</em>, with neck and bulge radii $\tfrac{2r}{1+r}$ and $\tfrac{2}{1+r}$. The choice $\lambda_0=+\alpha/|\alpha|$ gives a <em>nodoid</em>, with radii $\tfrac{2r}{1-r}$ and $\tfrac{2}{1-r}$. As $r\to1$ the unduloid tends to the cylinder, and as $r\to0$ to a chain of spheres. In genus 1 the λ-plane draws this diameter dashed, and the branch point snaps onto it.</li>
+    <li><b>Bubbletons.</b> A double branch point $\alpha_1=\alpha_2=\lambda_0\big(k-\sqrt{k^2-1}\big)^2$, $k\ge2$, sits at a resonance point of the cylinder, where its monodromy is $\pm I$. It adds $k$ lobes to the round cylinder. The curve is singular, but the Killing-field construction doesn't mind.</li>
+    <li><b>The Wente torus.</b> The first immersed CMC torus, found by Wente in 1986. It has spectral genus 2, with McIntosh's branch points refined by Newton's method on the closing conditions. Its lattice $\Gamma$ is rhombic. The monodromy along one generator is a rotation of order three, so the torus needs three copies of the lattice's fundamental domain.</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="whitham"><span class="n">10</span>Whitham deformations</h2>
+
+  <p>Tori are rare. The closing conditions cut out a set of lower dimension in the space of spectral data, so moving branch points at random immediately destroys a torus. <em>Whitham deformations</em> move the spectral curve while keeping (some of) the periods of the differentials $\Theta$, so they can follow families of tori. The viewer has two of them.</p>
+
+  <h3>The τ-flow (Hasse–Ogilvie–Schmidt)</h3>
+  <p>Let $B_a$ be the space of differentials $\Theta_w$, with polynomials $p_w$. Its <em>period plane</em> is the image of the real-linear period map $w\mapsto(\operatorname{Im}\oint_{B_j}\Theta_w/2\pi)_j$. The deformation keeps this plane <em>together with its complex structure</em> fixed. In coordinates, write $L(w)_j=\operatorname{Re}(\ell_j w)$. The plane with its complex structure is the complex line $[\ell]\in\mathbb{CP}^{g-1}$, and the flow is</p>
+  <div class="eqs">$$\ell\big(\alpha(t)\big)=z(t)\,\ell\big(\alpha(0)\big),$$ $$z(t)\in\mathbb C^\times .$$</div>
+  <p>The lattice of periods of the sinh-Gordon solution keeps its conformal type and only scales, $\Gamma(t)=\Gamma(0)/z(t)$. The rotation freedom is fixed by keeping $\arg a(0)$, so $\lambda_0$ and the curvature directions stay put. The result is a curve through the space of spectral data, traced by predictor–corrector continuation.</p>
+  <p>Along it the Willmore functional, in the notation of the paper,</p>
+  $$\mathcal W=2i\operatorname*{Res}_{\lambda=0}\,q_{b_2}\,\Theta_{b_1}$$
+  <p>serves as the parameter. Its critical points are exactly where the differentials acquire a common root on the unit circle, which is the translational closing condition of §9.</p>
+
+  <div class="viewer">The <i>Whitham deformation</i> section works from genus 2 on. Its slider is labelled 𝒲, and its ends are where the flow meets an obstacle: a branch point reaching 0 or the unit circle, or two colliding. A tick marks the critical point of 𝒲, and the slider snaps onto it. <i>Show the family</i> draws the path of every branch point along the curve, coloured by 𝒲 from blue (low) to rust (high). <i>Carry the domain along</i> scales the domain with the lattice. <i>Flow to common root</i> moves to the critical point and puts $\lambda_0$ on the common root. That puts the data on the set of §11, where the root-preserving flow takes over.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="rootflow"><span class="n">11</span>The root-preserving flow</h2>
+
+  <p>Let $\mathcal S^g$ be the set of spectral data whose differentials all vanish at a common point $\lambda_0$ of the unit circle. On it the translational closing condition holds for every direction at once. Carberry, Kilian, Klein and Schmidt study the Whitham deformations that keep both the periods and this common root. For $g=2$ the flow is two-dimensional. Its natural coordinates are the <em>Sym integrals</em>: take the basis $b_1,b_2$ of the differentials whose B-periods are $2\pi i\,\delta_{kl}$, and set</p>
+  <div class="eqs">$$\varphi_l=-\frac{i}{2}\int_{\sigma(y_0)}^{y_0}\Theta_{b_l},$$ $$l=1,2,$$</div>
+  <p>where $y_0$ lies over $\lambda_0$ and the path runs once around the real part of $\Sigma$ over the unit circle. The rotational closing condition then says exactly that both $\varphi_l$ are rational multiples of $\pi$.</p>
+
+  <div class="pair">
+    <div>
+      <p>For genus 2 their theorem is as clean as one could hope. The map $(\varphi_1,\varphi_2)$ is a diffeomorphism from $\mathcal S^2_{\lambda_0}$ onto the open triangle</p>
+      <div class="eqs">$$\varphi_1,\varphi_2&gt;0,$$ $$\varphi_1+\varphi_2&lt;\pi,$$</div>
+      <p>and the tori with Sym point $\lambda_0$ are exactly the points of $(\pi\mathbb Q)^2$ inside it. The Wente family, the data with real coefficients, is the diagonal $\varphi_1=\varphi_2$. The three-lobed Wente torus sits at $(\pi/3,\pi/3)$.</p>
+    </div>
+    <figure style="margin:4px 0 0">
+      <svg viewBox="0 0 250 236" role="img" aria-label="The square of Sym integrals with the triangle below its diagonal, the Wente diagonal dashed, and the Wente torus at pi over 3, pi over 3">
+        <path d="M40 20 L220 20 L220 200 Z" fill="#EAE4D6"/>
+        <g stroke="#CFC5B0" stroke-width="0.7">
+          <path d="M100 20V200M160 20V200M40 80H220M40 140H220"/>
+          <path d="M85 20V200M130 20V200M175 20V200M40 65H220M40 110H220M40 155H220" stroke-width="0.5" opacity="0.7"/>
+        </g>
+        <rect x="40" y="20" width="180" height="180" fill="none" stroke="#27231E" stroke-width="1.2"/>
+        <path d="M220 200 L40 20" stroke="#27231E" stroke-width="1"/>
+        <path d="M40 200 L130 110" stroke="#6A6257" stroke-dasharray="4 4"/>
+        <g fill="#27231E">
+          <circle cx="100" cy="140" r="4"/>
+          <circle cx="85" cy="110" r="2.2"/><circle cx="130" cy="155" r="2.2"/><circle cx="85" cy="155" r="2.2"/>
+          <circle cx="85" cy="80" r="2.2"/><circle cx="160" cy="155" r="2.2"/><circle cx="100" cy="110" r="2.2"/>
+        </g>
+        <g font-family="EB Garamond, serif" font-size="14" fill="#6A6257">
+          <text x="40" y="216" text-anchor="middle">0</text>
+          <text x="220" y="216" text-anchor="middle">π</text>
+          <text x="30" y="24" text-anchor="end">π</text>
+          <text x="130" y="228" text-anchor="middle" font-style="italic" font-size="16">φ<tspan font-size="11" dy="3" font-style="normal">1</tspan></text>
+          <text x="22" y="114" text-anchor="middle" font-style="italic" font-size="16">φ<tspan font-size="11" dy="3" font-style="normal">2</tspan></text>
+          <text x="108" y="150" font-style="italic" fill="#27231E">Wente</text>
+          <text x="152" y="100" font-style="italic" transform="rotate(45 152 100)" font-size="13">|α| → 1</text>
+          <text x="56" y="195" font-style="italic" font-size="12">α → 0</text>
+        </g>
+      </svg>
+      <figcaption>The pad of Sym integrals. Dots are a few tori; the large one is the Wente torus.</figcaption>
+    </figure>
+  </div>
+
+  <p>The viewer doesn't integrate this flow as an ODE. Since $\varphi$ are coordinates, reaching a target $\varphi$ is a root-finding problem in the branch points: pin the common root at $\lambda_0$, set $\varphi$ equal to the target, and solve by Gauss–Newton. The target is approached along a straight path in small steps, so the solution stays on one branch. The flows commute, so there is no holonomy: a closed loop in the triangle brings the branch points back where they started.</p>
+  <p>At the edges of the triangle the data degenerate. Towards the hypotenuse the branch points approach the unit circle. At the corner $\varphi=0$ both branch points run into 0. There $\varphi$ grows like $\sqrt{|\alpha|}$, the period lattice shrinks at the same rate, and the conformal factor develops sharp bubbles. Suitably rescaled, such sequences of tori converge to minimal surfaces (Carberry–Klein–Schmidt).</p>
+
+  <div class="viewer">The <i>Root-preserving flow</i> section works in genus 2, once $\lambda_0$ sits on a common root (◆). Drag the dot in the square. It snaps to crossings of the grid lines, which are tori with denominators up to 6; hold alt to avoid snapping. <i>Carry the domain along</i> keeps the domain in proportion to the shrinking lattice near the corner. The flow stops just short of the edges.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="edges"><span class="n">12</span>At the edges of the disc</h2>
+  <ul>
+    <li><b>$|\alpha_i|\to1$.</b> A branch point meets its reflection on the unit circle and $\Sigma$ acquires a double point. The surfaces still make sense; the unduloid, for example, tends to the cylinder. But the periods become harder to compute, and the viewer keeps $|\alpha_i|\le0.999$ (and $\le0.98$ while tracing a τ-family).</li>
+    <li><b>$\alpha_i\to0$.</b> Then $a(0)\to0$, $\kappa_0\to0$ and $u$ is unbounded. The surfaces break up into sphere chains, bubbletons and bubbles. This limit is where the adaptive integrator and the carried domain matter.</li>
+    <li><b>$\alpha_i=\alpha_j$.</b> The curve is singular, but the formulas for the base Killing field are unaffected; this is how bubbletons arise.</li>
+    <li><b>$\lambda_0$ off the circle.</b> Then $F$ is not $SU(2)$-valued and $f$ leaves $\mathbb R^3$. Two distinct Sym points $\lambda_1\ne\lambda_2$ on the circle would instead give CMC surfaces in $S^3$, via $f=F(\lambda_1)F(\lambda_2)^{-1}$. The viewer doesn't do this.</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="refs"><span class="n">13</span>References</h2>
+  <ol class="refs">
+    <li>H. C. Wente, <i>Counterexample to a conjecture of H. Hopf</i>, Pacific J. Math. 121 (1986), 193–243.</li>
+    <li>U. Pinkall and I. Sterling, <i>On the classification of constant mean curvature tori</i>, Ann. of Math. 130 (1989), 407–451.</li>
+    <li>N. J. Hitchin, <i>Harmonic maps from a 2-torus to the 3-sphere</i>, J. Differential Geom. 31 (1990), 627–710.</li>
+    <li>A. I. Bobenko, <i>All constant mean curvature tori in R³, S³, H³ in terms of theta-functions</i>, Math. Ann. 290 (1991), 209–245.</li>
+    <li>F. E. Burstall, D. Ferus, F. Pedit and U. Pinkall, <i>Harmonic tori in symmetric spaces and commuting Hamiltonian systems on loop algebras</i>, Ann. of Math. 138 (1993), 173–212.</li>
+    <li>N. Ercolani, H. Knörrer and E. Trubowitz, <i>Hyperelliptic curves that generate constant mean curvature tori in R³</i>, in Integrable Systems (Luminy 1991), Progr. Math. 115, Birkhäuser (1993).</li>
+    <li>I. McIntosh, <i>Harmonic tori and their spectral data</i>, Adv. Stud. Pure Math. 51 (2008), 285–314; <a href="https://arxiv.org/abs/math/0407248">arXiv:math/0407248</a>.</li>
+    <li>M. Knopf, R. Peña Hoepner and M. U. Schmidt, <i>Solutions of the sinh-Gordon equation of spectral genus two and constrained Willmore tori I</i>, <a href="https://arxiv.org/abs/1708.00887">arXiv:1708.00887</a>.</li>
+    <li>N. Hasse, R. Ogilvie and M. U. Schmidt, <i>Solutions of the sinh-Gordon equation of spectral genus two and constrained Willmore tori II</i>, preprint.</li>
+    <li>E. Carberry, M. Kilian, S. Klein and M. U. Schmidt, <i>The space of genus two spectral curves of constant mean curvature tori in R³</i>, <a href="https://arxiv.org/abs/2110.00436">arXiv:2110.00436</a>.</li>
+    <li>E. Carberry, S. Klein and M. U. Schmidt, <i>Blowing up sequences of constant mean curvature tori in R³ to minimal surfaces</i>, <a href="https://arxiv.org/abs/2110.01574">arXiv:2110.01574</a>.</li>
+  </ol>
+
+  <footer>
+    <p>The full specification, with the conventions checked numerically, is in <a href="cmc_spectral_to_immersion.md">cmc_spectral_to_immersion.md</a>. Set in EB Garamond and Garamond-Math (SIL Open Font License); formulas typeset by Temml; surfaces drawn with three.js.</p>
+    <p><a class="back" href="index.html">← The viewer</a></p>
+  </footer>
+</main>
+
+<script src="vendor/temml/temml.min.js"></script>
+<script>
+  temml.renderMathInElement(document.body, { fences: '$', throwOnError: false, wrap: 'tex' });
+  // highlight the current section in the side contents (wide screens)
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const secs = links.map((a) => document.querySelector(a.getAttribute('href')));
+  const mark = () => {
+    let i = 0;
+    secs.forEach((s, k) => { if (s.getBoundingClientRect().top < 160) i = k; });
+    links.forEach((a, k) => a.classList.toggle('on', k === i));
+  };
+  addEventListener('scroll', mark, { passive: true });
+  mark();
+</script>
+</body>
+</html>

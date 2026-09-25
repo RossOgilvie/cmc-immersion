@@ -2,7 +2,8 @@
 
 An interactive viewer for constant-mean-curvature (H = ½) immersions of the plane in R³,
 computed from spectral data (branch points αᵢ, Sym point λ₀, isospectral times τ) by integrating
-polynomial Killing fields. The mathematics is in `cmc_spectral_to_immersion.md`; the plan in `PLAN.md`.
+polynomial Killing fields. `about.html` ("Learn more" in the panel) explains the process for readers;
+the full specification is in `cmc_spectral_to_immersion.md`; the plan in `PLAN.md`.
 
 ## Running
 
@@ -44,5 +45,6 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
     src/spectral-widget.js λ-plane editor
     src/app.js             panel, scheduling (coarse preview while dragging, then full), presets, export
     test/                  node tests against cmc_reference.py:  python3 test/fixtures.py && node test/run.mjs
-    vendor/                three.js r186; fonts/: EB Garamond (SIL OFL), served locally
+    about.html             the "Learn more" page (maths typeset by Temml as MathML); img/: its pictures
+    vendor/                three.js r186; temml/: Temml (MIT); fonts/: EB Garamond and Garamond-Math (SIL OFL)
     old/                   the earlier theta-function attempt
