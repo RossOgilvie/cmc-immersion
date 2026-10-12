@@ -183,7 +183,7 @@
   #sizeRows { --labw: 50px; }
   #phiRow { --labw: 50px; }
   #appearanceRows { --labw: 96px; }
-  #closeInfo { display: block; }
+  #rescaleInfo { display: block; }
 
   .help p { margin: 4px 0 6px; font-size: 15.5px; font-style: italic; color: var(--muted); }
   .more { text-decoration: none; font-variant-caps: all-small-caps; letter-spacing: 0.09em; }
@@ -256,18 +256,18 @@
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="dpBox"><span class="chev" data-glyph="chev"></span>Plane of differentials</button></h2>
     <div class="secbody" id="dpBox">
       <canvas id="periodPad" aria-label="The plane of differentials, with integer period vectors near it; click one to lock it in" title="Click a point to move the curve so that the plane passes through it (locked in, rust ring); a second point makes the data doubly periodic; click a locked point to release it. The wheel zooms, shift-drag pans, double-click fits."></canvas>
-      <button class="disc bphead" type="button" aria-expanded="true" aria-controls="dpInfo"><span class="chev" data-glyph="chev"></span><i>Periods and lattice</i></button>
+      <p class="note" id="dpHover"></p>
+      <button class="disc bphead" type="button" aria-expanded="true" aria-controls="dpInfo"><span class="chev" data-glyph="chev"></span><i>Lattice and domain</i></button>
       <div id="dpInfo">
-        <p class="note" id="dpHover"></p>
         <p class="note" id="dpNote"></p>
+        <div id="sizeRows"></div>
+        <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>Align grid with curvature lines</span></label>
+        <div id="phiRow"></div>
+        <div class="btnrow">
+          <button class="tbtn" id="rescaleBtn" type="button" title="Resize the domain (keeping its centre and angle) to the smallest rectangle enclosing the parallelogram of w₁, w₂: a whole period cell. Needs a lattice.">Rescale domain to lattice</button>
+        </div>
+        <span class="note" id="rescaleInfo"></span>
       </div>
-      <div id="sizeRows"></div>
-      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>Align grid with curvature lines</span></label>
-      <div id="phiRow"></div>
-      <div class="btnrow">
-        <button class="tbtn" id="closeBtn" type="button" title="Find the periods along the grid directions and trim the domain to one closed piece">Close up</button>
-      </div>
-      <span class="note" id="closeInfo"></span>
     </div>
   </section>
 

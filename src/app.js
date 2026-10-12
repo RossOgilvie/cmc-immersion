@@ -564,9 +564,9 @@ function buildTau() {
     : 'For genus ≤ 2 every isospectral deformation is a translation: x₀ and y₀ move the centre of the domain.';
 }
 
-// each domain slider resets to the domain of the last preset, link or close-up (homeDomain)
+// each domain slider resets to the domain of the last preset or link (homeDomain)
 const homeReset = (what, apply) => ({
-  title: `${what} back to the last preset, link or close-up`,
+  title: `${what} back to the last preset or link`,
   onClick: () => {
     apply(homeDomain);
     for (const sl of [...domainSliders, phiSlider]) sl.refresh();
@@ -1285,6 +1285,7 @@ function dpLockIndex(p) {
 function dpUpdate() {
   const g = genus(), note = $('dpNote');
   periodPad.enabled = g >= 2 && !dp.running;
+  $('rescaleBtn').disabled = !(g >= 2 && leaf.lattice);
   if (g < 2) { periodPad.set({ points: [], locked: [], frame: null, domain: null }); note.textContent = 'Needs genus ≥ 2.'; return; }
   if ($('dpBox').hidden) return; // drawn when the section is opened
   const key = JSON.stringify([state.alphas, leaf.locks, leaf.w]);
@@ -1435,41 +1436,25 @@ function dpLattice(ell, ms) {
   tauReset();
 }
 
-// ------------------------------------------------------------------ closing up
+// ------------------------------------------------------------------ rescaling the domain to the lattice
 
-$('closeBtn').addEventListener('click', () => {
-  const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-  const info = $('closeInfo');
-  info.textContent = 'Searching for periods…';
-  $('closeBtn').disabled = true;
-  const done = () => { w.terminate(); $('closeBtn').disabled = false; };
-  w.onerror = (e) => { info.textContent = `Error: ${e.message}`; done(); };
-  w.onmessage = (e) => {
-    done();
-    if (e.data.error) { info.textContent = e.data.error; return; }
-    const parts = [];
-    let changedAny = false;
-    for (const d of ['s', 't']) {
-      const r = e.data.result[d];
-      const name = d === 's' ? 'width' : 'height';
-      if (!r) { parts.push(`${d}: no period`); continue; }
-      if (r.q) {
-        state[name] = r.q * r.T;
-        changedAny = true;
-        parts.push(`${d}: closes after ${r.q === 1 ? 'one period' : `${r.q} periods`} (${fmt(r.q * r.T, 5)})`);
-      } else {
-        parts.push(`${d}: period ${fmt(r.T, 4)}, turns ${fmt(r.angle, 4)}, pitch ${fmt(r.pitch, 3)}`);
-      }
-    }
-    info.textContent = parts.join(' · ');
-    if (changedAny) {
-      for (const s of domainSliders) s.refresh();
-      saveHomeDomain();
-      needFrame = true;
-      changed(false);
-    }
-  };
-  w.postMessage({ id: 0, kind: 'close', params: { ...params(true), hmax: Math.min(state.hmax, 0.01) } });
+// With a lattice: keep the centre z0 and the grid angle, and make the domain the smallest rectangle that
+// encloses the parallelogram spanned by the frame w_1, w_2 (the differentials b_1, b_2), centred at z0.
+// In grid coordinates r_k = e^{-i phi} w_k it has width |Re r_1| + |Re r_2| and height |Im r_1| + |Im r_2|,
+// so it contains a whole period cell. (The shooting search along the grid lines, closingInfo in cmc.js,
+// is no longer in the panel; see PLAN.)
+$('rescaleBtn').addEventListener('click', () => {
+  if (!leaf.lattice) return;
+  const phi = state.curv ? -0.5 * hopfArg(state.alphas, state.theta0) : state.phi;
+  const r = displayFrame().map(([x, y]) => [Math.cos(phi) * x + Math.sin(phi) * y, Math.cos(phi) * y - Math.sin(phi) * x]);
+  state.width = Math.abs(r[0][0]) + Math.abs(r[1][0]);
+  state.height = Math.abs(r[0][1]) + Math.abs(r[1][1]);
+  for (const sl of domainSliders) sl.refresh();
+  const at = state.z0[0] || state.z0[1] ? `the domain centre z₀ = ${fmt(state.z0[0], 3)} + ${fmt(state.z0[1], 3)} i` : 'the origin';
+  $('rescaleInfo').textContent = `Domain ${fmt(state.width, 4)} × ${fmt(state.height, 4)}: encloses the parallelogram of w₁, w₂, translated to be centred at ${at}.`;
+  if (whitham.curve) whitham.applied = null; // becomes the new base at the next Whitham move
+  needFrame = true;
+  changed(false);
 });
 
 // ------------------------------------------------------------------ appearance
@@ -1566,7 +1551,7 @@ presetSel.addEventListener('change', () => {
 $('frameBtn').addEventListener('click', () => viewer.frame());
 $('viewReset').addEventListener('click', () => { viewer.resetOrientation(); viewer.frame(); });
 
-// the domain of the last preset, link or close-up, which the domain sliders' reset buttons return to
+// the domain of the last preset or link, which the domain sliders' reset buttons return to
 let homeDomain = null;
 const saveHomeDomain = () => { homeDomain = structuredClone({ z0: state.z0, width: state.width, height: state.height, curv: state.curv, phi: state.phi }); };
 $('pngBtn').addEventListener('click', () => download(viewer.snapshot(), 'cmc-surface.png'));
@@ -1605,7 +1590,7 @@ function refreshAll() {
   $('acc').value = state.adaptive ? 'adaptive' : String(state.hmax);
   if (!$('acc').value) { $('acc').add(new Option(`h ≤ ${state.hmax}`, String(state.hmax))); $('acc').value = String(state.hmax); }
   viewer.setScale(1 / (2 * state.H));
-  $('closeInfo').textContent = '';
+  $('rescaleInfo').textContent = '';
   whithamRecentre();
   $('curv').checked = state.curv;
   $('phiRow').classList.toggle('hide', state.curv);

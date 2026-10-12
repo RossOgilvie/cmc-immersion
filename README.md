@@ -26,13 +26,15 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
 - **Plane of differentials:** the plane of differentials in the w-plane (= z-plane), with the frame, the
   domain, and the integer period vectors near the plane (darker = smaller predicted move of the branch
   points to lock it in; diamonds = periods already, in the plane; triangles = found by LLL).
-  *Periods and lattice* (collapsible) gives the hovered point and the lattice.
+  The hovered point is described below the picture; *Lattice and domain* (collapsible) holds the lattice note
+  and the domain controls below.
   Click a point to lock it in, which moves the branch points so the plane passes through it. A second
   point makes the data doubly periodic and re-anchors the frame to an adapted basis of the lattice,
   with the invariants (n₁, n₂, n₃) and τ in F₆, F₃ or F₁. Click a locked point to release it.
-  Below it the size of the domain (width, height), the curvature-line alignment and *close up* (trims to
-  one closed piece along the grid directions). The domain sliders (here and x₀, y₀ in the isospectral
-  section) each have a reset button: back to the last preset, link or close-up.
+  Below it the size of the domain (width, height), the curvature-line alignment and *rescale domain to
+  lattice* (with a lattice: the smallest rectangle, same centre and angle, enclosing the parallelogram of
+  w₁, w₂). The domain sliders (here and x₀, y₀ in the isospectral section) each have a reset button: back
+  to the last preset or link.
 - **Whitham deformation** (genus ≥ 2): the slider moves the branch points along the curve on which the
   period plane and its complex structure are fixed (the lattice of the sinh-Gordon solution keeps its
   conformal type and scales by 1/z; the domain can follow it). *Recentre here* makes the current curve

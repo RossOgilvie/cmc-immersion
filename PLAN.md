@@ -164,8 +164,7 @@ Open:
   configurations, then a period condition, then the deformations that preserve it. The Domain section is
   gone: width, height, curvature-line alignment, Close up and Reset domain are in the Plane of
   differentials; x0, y0 (the translations) in Isospectral deformation. Reset domain became a reset
-  button on each domain slider (and the angle). Open: revisit the behaviour of Align grid and Close up
-  in their new place (e.g. a domain spanned by lattice vectors).
+  button on each domain slider (and the angle). Open: revisit the behaviour of Align grid.
 - Done: **genus 2 τ pad** draws F_3 alone (three copies of F_1), starts on all of F_3, and draws the
   boundary of S^2 (genus2.js; HOS genus 2 paper): at the nodal end t = t_0(k) with the paper's Re/Im τ,
   at the open end the real locus of f_0 = i (K - E)/E'. Complete elliptic integrals of complex modulus
@@ -174,9 +173,17 @@ Open:
   with real δ_2/δ_1 on the locus. Note for the paper: the open-end τ is τ_0/(1 + τ_0), τ_0 = iK(α)/K(α'),
   for the basis dual to B_1^+, B_2^+ (the two differentials written down there have periods on B_1^+ and
   B_1^+ - B_2^+); iK/K' itself is another sheet of F_3 over F_1.
-- General torus search (closing conditions in the UI), and a "close up" that uses the lattice Γ rather
-  than the grid axes (so non-rectangular fundamental domains work; for the root-preserving flow, the
-  torus lattice at rational phi).
+- Done: "Close up" (shooting along the two grid lines for a period of zeta, then the Euclidean motion,
+  closing after q <= 24 periods) replaced by "Rescale domain to lattice": the smallest rectangle (same
+  centre and grid angle) enclosing the parallelogram of the frame w_1, w_2. closingInfo stays in cmc.js
+  (and its tests).
+- **Future: a lattice-aware close up.** With a lattice Γ: take a reduced basis, check the closing
+  conditions on small multiples of the basis vectors (no translational period, p_w(λ_0) = 0; no
+  rotational period, μ_w(λ_0) = ±1, via the Sym integrals), find the torus sublattice Γ' ⊂ Γ, and set the
+  domain to its fundamental parallelogram. Needs non-rectangular (parallelogram) domains in the mesh; keep
+  the shooting along the grid lines (closingInfo) as the fallback without a lattice; for the
+  root-preserving flow, the torus lattice at rational phi. Also: a general torus search (all the closing
+  conditions in the UI).
 - Root-preserving flow: done for even g (g >= 4 with the period plane as 2(g - 2) extra equations, a basis
   orthonormal in the plane, and a pad that marks where the flow stops). phi folds over within ~0.02 pi of
   the anchor in the examples tried, so the pad can't pass folds: continuing past one needs path-following
