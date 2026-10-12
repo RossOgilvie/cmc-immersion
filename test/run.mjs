@@ -9,6 +9,11 @@ import {
 import { periodVector, periodLattice, commonRootsOnCircle } from '../src/cmc/periods.js';
 import { WhithamCurve } from '../src/cmc/whitham.js';
 import { RootFlow, symData } from '../src/cmc/rootflow.js';
+import { ellipticKE, nodalBoundary, f0, openEndTau } from '../src/cmc/genus2.js';
+import {
+  TauFlow, leafData, periodsOf, rationalPlanes, saturate, reduceFrame, classOrder, nearbyPeriods,
+  PlaneFlow, latticeFrame, predictMoves,
+} from '../src/cmc/leaf.js';
 
 let failures = 0;
 function check(name, value, tol) {
@@ -274,6 +279,106 @@ for (const [name, al] of [
   const d = symData(r.alphas, 0, P, f.ref);
   const planeErr = Math.max(...[0, 1].flatMap((l) => { const c = d.Bm.map((row) => row[l]), n = Math.hypot(...c); return f.normals.map((N) => Math.abs(c.reduce((acc, v, j) => acc + v * N[j], 0) / n)); }));
   check('genus 4: flow keeps the period plane', planeErr, 1e-9);
+}
+
+// ------------------------------------------------------------------ leaves: the tau pad, LLL, locking periods
+console.log('leaves of the Whitham foliation (leaf.js):');
+{
+  // tau at fixed psi = sum logit|alpha_j|: the periods of the frame and psi stay fixed, and a loop in tau
+  // returns to the start
+  const run = (f, t) => { let r; for (let i = 0; i < 2000; i++) { r = f.moveToward(t, { budget: 50 }); if (r.reached || r.blocked) break; } return r; };
+  for (const al of [[[0.4, 0.25], [-0.3, 0.5]], [[0.4, 0.25], [-0.3, 0.5], [0.1, -0.6]]]) {
+    const g = al.length, f = new TauFlow(al, [[1, 0], [0, 1]]);
+    const r = run(f, [0.01, 1.01]);
+    const d = leafData(r.alphas, f.ref);
+    const perr = Math.max(...[0, 1].flatMap((k) => periodsOf(d.ell, r.w[k]).map((v, j) => Math.abs(v - f.P[k][j]))));
+    check(`g=${g} tau pad reaches tau = 0.01 + 1.01 i`, r.reached ? Math.hypot(r.tau[0] - 0.01, r.tau[1] - 1.01) : Infinity, 1e-9);
+    check(`g=${g} tau pad keeps the periods of the frame`, perr, 1e-9);
+    const psi = r.alphas.reduce((s, [a, b]) => { const q = Math.hypot(a, b); return s + Math.log(q / (1 - q)); }, 0);
+    check(`g=${g} tau pad keeps psi`, Math.abs(psi - f.psi0), 1e-9);
+    run(f, [-0.01, 0.99]);
+    const back = run(f, [0, 1]);
+    check(`g=${g} tau pad around a loop returns to the start (no holonomy)`, Math.hypot(...back.alphas.flat().map((v, i) => v - al.flat()[i])), 1e-8);
+  }
+}
+{
+  // LLL finds a rational plane, with a basis of its lattice: span(m1, m2) with m1 = (1, 2, 0, -1), m2 = (0, 1, 3, 1)
+  const m1 = [1, 2, 0, -1], m2 = [0, 1, 3, 1];
+  const v1 = m1.map((v, j) => 0.7 * v + 0.2 * m2[j]), v2 = m1.map((v, j) => -0.3 * v + 1.1 * m2[j]);
+  const P = rationalPlanes(v1.map((v, j) => [v, -v2[j]]));
+  const best = P.find((p) => p.dist < 1e-10);
+  // the found basis spans the same lattice: its coordinates in (m1, m2) form a unimodular matrix
+  const coords = best ? best.m.map((m) => { const a = m[0], b = m[1] - 2 * a; return [a, b, m.every((v, j) => v === a * m1[j] + b * m2[j])]; }) : null;
+  check('LLL recognises a rational plane with a basis of its lattice',
+    coords && coords.every((c) => c[2]) ? Math.abs(Math.abs(coords[0][0] * coords[1][1] - coords[0][1] * coords[1][0]) - 1) : Infinity, 0);
+  const S = saturate([2, 4, 0, -2], [1, 3, 3, 0]); // 2 m1 and m1 + m2: index 2 in the lattice
+  const area = (a, b) => Math.sqrt(a.reduce((s, x) => s + x * x, 0) * b.reduce((s, x) => s + x * x, 0) - a.reduce((s, x, j) => s + x * b[j], 0) ** 2);
+  check('saturate: the lattice of the plane (same area as m1, m2)', Math.abs(area(...S) - area(m1, m2)), 1e-9);
+}
+{
+  // reduction into F_6, F_3, F_1 keeps the lattice and the classes mod 2
+  let worst = 0;
+  for (const kind of ['F6', 'F3', 'F1']) for (const t of [[3.7, 0.05], [-0.45, 0.3], [0.2, 0.01], [-7.1, 2]]) {
+    const [b1, b2] = reduceFrame([{ w: [1, 0], m: [1, 0] }, { w: t, m: [0, 1] }], kind);
+    const [x, y] = [(b2.w[0] * b1.w[0] + b2.w[1] * b1.w[1]) / (b1.w[0] ** 2 + b1.w[1] ** 2), (b2.w[1] * b1.w[0] - b2.w[0] * b1.w[1]) / (b1.w[0] ** 2 + b1.w[1] ** 2)];
+    const inside = kind === 'F1' ? Math.abs(x) <= 0.5 + 1e-9 && x * x + y * y >= 1 - 1e-9
+      : Math.abs(x) <= 1 + 1e-9 && Math.hypot(x - 0.5, y) >= 0.5 - 1e-9 && Math.hypot(x + 0.5, y) >= 0.5 - 1e-9 && (kind === 'F6' || x * x + y * y >= 1 - 1e-9);
+    const det = b1.m[0] * b2.m[1] - b1.m[1] * b2.m[0];
+    const parity = kind === 'F6' ? (b1.m[0] % 2 !== 0) && (b1.m[1] % 2 === 0) && (b2.m[0] % 2 === 0) && (b2.m[1] % 2 !== 0) : true;
+    if (!inside || det !== 1 || !parity) worst = Infinity;
+  }
+  check('reduction into F_6 (by Gamma(2)), F_3 and F_1, with determinant 1', worst, 0);
+  const labels = new Set([[0, 1.6], [0.78, 1.6], [0, 0.75], [0.3, 0.62], [0.75, 0.82], [0.8, 0.45]].map(classOrder));
+  check('the six copies of F_1 in F_6 have six different class orders', 6 - labels.size, 0);
+}
+{
+  // lock two integer periods into the plane (genus 3): the data become doubly periodic, and zeta closes up
+  const al = [[0.4, 0.25], [-0.3, 0.5], [0.1, -0.6]];
+  const go = (f) => { let s; for (let i = 0; i < 500; i++) { s = f.advance(100); if (s.done || s.blocked) break; } return s; };
+  const d0 = leafData(al), pts = nearbyPeriods(d0.ell);
+  const f1 = new PlaneFlow(al, [pts[0].m], d0.ell), s1 = go(f1);
+  const d1 = f1.data(), second = nearbyPeriods(d1.ell).find((p) => p.dist > 1e-8);
+  const pred = predictMoves(al, d0.ell, [pts[0].m])[0], moved = Math.hypot(...s1.alphas.flat().map((v, i) => v - al.flat()[i]));
+  check('predicted move of a lock vs the actual move (relative)', Math.abs(pred - moved) / moved, 0.05);
+  check('lock one period: it lies in the plane', s1.done ? nearbyPeriods(d1.ell).find((p) => p.m.join() === pts[0].m.join()).dist : Infinity, 1e-9);
+  const f2 = new PlaneFlow(s1.alphas, [pts[0].m, second.m], d1.ell), s2 = go(f2);
+  const d2 = f2.data(), L = latticeFrame(d2.ell, ...saturate(pts[0].m, second.m));
+  const intErr = Math.max(...L.w.flatMap((w) => periodsOf(d2.ell, w).map((v) => Math.abs(v - Math.round(v)))));
+  check('lock two periods: the lattice basis has integer periods', s2.done ? intErr : Infinity, 1e-9);
+  const Z = killingField(s2.alphas), I = new FrameIntegrator(s2.alphas, 0);
+  let zerr = 0;
+  for (const w of L.w) {
+    const y0 = I.initialState(Z), y = y0.slice(), r = Math.hypot(...w);
+    I.march(y, w[0] / r, w[1] / r, r, 0.002);
+    for (let k = 0; k < 8 * 5; k++) zerr = Math.max(zerr, Math.abs(y[k] - y0[k]));
+  }
+  check('lock two periods: zeta(z + w) = zeta(z) for both basis vectors (shooting)', zerr, 1e-8);
+}
+
+// ------------------------------------------------------------------ genus 2: the boundary of S^2 in F_3
+console.log('genus 2: the boundary of S^2 (genus2.js) against the periods:');
+{
+  const { K, E } = ellipticKE([0.6, 0]);
+  check('K(0.6), E(0.6) by the AGM', Math.max(Math.abs(K[0] - 1.7507538029157526), Math.abs(E[0] - 1.4180833944487245)), 1e-13);
+  // nodal end: open the node at -e^{i phi}, t = cot(phi/2) = t0(k), slightly; simple root at -r
+  const k = 0.5, { t0, tau } = nodalBoundary(k), r = (1 - k) / (1 + k), phi = 2 * Math.atan(1 / t0);
+  const al = [[-(1 - 1e-4) * Math.cos(phi), -(1 - 1e-4) * Math.sin(phi)], [-r, 0]];
+  const L = latticeFrame(leafData(al).ell, [1, 0], [0, 1]);
+  const err = Math.min(Math.hypot(L.tau[0] - tau[0], L.tau[1] - tau[1]), Math.hypot(L.tau[0] + tau[0], L.tau[1] - tau[1]));
+  check('nodal end: tau of the paper = tau of the lattice (node opened by 1e-4)', err, 1e-4);
+  // open end: on the real locus of f0, rescaled roots s alpha, s / alpha with s = 1e-3
+  const rho = 0.6, g = (th) => f0([rho * Math.cos(th), rho * Math.sin(th)])[1];
+  let lo = 1e-6, hi = Math.PI / 2 - 1e-6;
+  const glo = g(lo);
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (Math.sign(g(m)) === Math.sign(glo)) lo = m; else hi = m; }
+  const a = [rho * Math.cos(lo), rho * Math.sin(lo)], s = 1e-3, a2 = a[0] ** 2 + a[1] ** 2;
+  const d = leafData([[s * a[0], s * a[1]], [(s * a[0]) / a2, (-s * a[1]) / a2]]), M = latticeFrame(d.ell, [1, 0], [0, 1]);
+  const t2 = openEndTau(a);
+  const err2 = Math.min(Math.hypot(M.tau[0] - t2[0], M.tau[1] - t2[1]), Math.hypot(M.tau[0] + t2[0], M.tau[1] - t2[1]));
+  check('open end: tau of the formula = tau of the lattice (s = 1e-3)', err2, 2e-3);
+  const lin = (w) => [w[0] * d.p1[1][0] + w[1] * d.pi[1][0], w[0] * d.p1[1][1] + w[1] * d.pi[1][1]];
+  const [u, v] = [lin(M.w[0]), lin(M.w[1])];
+  check('open end: on the real locus of f0 the ratio of linear coefficients is real', Math.abs(u[0] * v[1] - u[1] * v[0]) / Math.hypot(...u) / Math.hypot(...v), 1e-3);
 }
 
 // ------------------------------------------------------------------ timing

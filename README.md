@@ -23,6 +23,16 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
   plane, `Q`/`E` toward/away, `F` frames the surface, `R` resets. Touch: drag, pinch, twist.
 - **λ-plane:** drag branch points (dots) and the Sym point (diamond); shift+drag turns everything;
   double-click adds or removes a branch point. Blue rings are the eigenline divisor at the domain centre.
+- **Plane of differentials:** the plane of differentials in the w-plane (= z-plane), with the frame, the
+  domain, and the integer period vectors near the plane (darker = smaller predicted move of the branch
+  points to lock it in; diamonds = periods already, in the plane; triangles = found by LLL).
+  *Periods and lattice* (collapsible) gives the hovered point and the lattice.
+  Click a point to lock it in, which moves the branch points so the plane passes through it. A second
+  point makes the data doubly periodic and re-anchors the frame to an adapted basis of the lattice,
+  with the invariants (n₁, n₂, n₃) and τ in F₆, F₃ or F₁. Click a locked point to release it.
+  Below it the size of the domain (width, height), the curvature-line alignment and *close up* (trims to
+  one closed piece along the grid directions). The domain sliders (here and x₀, y₀ in the isospectral
+  section) each have a reset button: back to the last preset, link or close-up.
 - **Whitham deformation** (genus ≥ 2): the slider moves the branch points along the curve on which the
   period plane and its complex structure are fixed (the lattice of the sinh-Gordon solution keeps its
   conformal type and scales by 1/z; the domain can follow it). *Recentre here* makes the current curve
@@ -30,8 +40,13 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
   *Show the family* draws, live, the path of each branch point along the Whitham curve through the
   current data, coloured by the Willmore functional 𝒲 (blue low, red high), with a tick
   across the paths at the critical points of 𝒲.
-- **Domain:** *close up* trims to one closed piece along the grid directions; *reset domain* returns to
-  the domain of the last preset, link or close-up. *Reset view* resets the rotation and frames.
+  The *τ pad* under the slider moves the other way along the 3-dimensional leaf on which the period
+  plane is fixed: τ = w₂/w₁ of the frame changes and ψ = Σ logit|αⱼ| stays fixed (a slice across the
+  slider's τ-fibres; in genus 2 it meets each fibre once). The fundamental domain F₆ is drawn, cut into
+  its six copies of F₁; wheel zooms, shift-drag pans, double-click shows all of F₆. Genus 2: F₃ alone,
+  with its three copies of F₁, and the boundary of S² (blue: at the nodal end solid, at the open end dashed).
+- **Isospectral deformation:** x₀, y₀ (the translations: the centre of the domain) and the shape times.
+- *Reset view* resets the rotation and frames.
 - *Copy link* copies a URL that reproduces the surface; opening it loads that state and then clears it from the address bar.
 
 ## Layout
@@ -40,9 +55,13 @@ presets; a hard reload, Ctrl+Shift+R, fixes that too).
     src/cmc/poly.js        complex polynomials and roots
     src/cmc/periods.js     periods of Theta_w, the lattice of periods of zeta (§9)
     src/cmc/whitham.js     Whitham deformations by predictor-corrector continuation
+    src/cmc/leaf.js        leaves (fixed period plane): the τ pad flow, LLL, locking periods, lattice invariants
+    src/cmc/rootflow.js    the root-preserving flow (Sym integrals)
+    src/cmc/genus2.js      genus 2: the boundary of S² in F₃ (complete elliptic integrals of complex modulus)
     src/worker.js          computation off the main thread
     src/viewer.js          three.js scene, controls, shader (two-sided, curvature lines, colour maps)
     src/spectral-widget.js λ-plane editor
+    src/sym-pad.js, src/tau-pad.js, src/period-pad.js   the pads (Sym integrals, τ, the plane of differentials)
     src/app.js             panel, scheduling (coarse preview while dragging, then full), presets, export
     test/                  node tests:  node test/run.mjs  (fixtures.json: values from the retired Python reference)
     about.html             the "Learn more" page (maths typeset by Temml as MathML); img/: its pictures

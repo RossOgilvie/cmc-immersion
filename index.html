@@ -174,8 +174,13 @@
   .bprow .gly { justify-self: end; }
   sub { font-size: 0.68em; line-height: 0; }
 
-  #symPad { width: 100%; max-width: 290px; aspect-ratio: 1; display: block; margin: 2px auto 0; touch-action: none; }
-  #domainRows { --labw: 50px; }
+  #symPad, #tauPad { width: 100%; max-width: 290px; aspect-ratio: 1; display: block; margin: 2px auto 0; touch-action: none; }
+  #tauPad { margin-top: 10px; }
+  #tauPadNote, #dpNote { white-space: pre-line; }
+  #periodPad { width: 100%; max-width: 290px; aspect-ratio: 1; display: block; margin: 2px auto 0; touch-action: none; }
+  #dpHover { min-height: 1.35em; }
+  #dpHover:empty { display: block; }
+  #sizeRows { --labw: 50px; }
   #phiRow { --labw: 50px; }
   #appearanceRows { --labw: 96px; }
   #closeInfo { display: block; }
@@ -248,12 +253,33 @@
   </section>
 
   <section class="sec">
+    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="dpBox"><span class="chev" data-glyph="chev"></span>Plane of differentials</button></h2>
+    <div class="secbody" id="dpBox">
+      <canvas id="periodPad" aria-label="The plane of differentials, with integer period vectors near it; click one to lock it in" title="Click a point to move the curve so that the plane passes through it (locked in, rust ring); a second point makes the data doubly periodic; click a locked point to release it. The wheel zooms, shift-drag pans, double-click fits."></canvas>
+      <button class="disc bphead" type="button" aria-expanded="true" aria-controls="dpInfo"><span class="chev" data-glyph="chev"></span><i>Periods and lattice</i></button>
+      <div id="dpInfo">
+        <p class="note" id="dpHover"></p>
+        <p class="note" id="dpNote"></p>
+      </div>
+      <div id="sizeRows"></div>
+      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>Align grid with curvature lines</span></label>
+      <div id="phiRow"></div>
+      <div class="btnrow">
+        <button class="tbtn" id="closeBtn" type="button" title="Find the periods along the grid directions and trim the domain to one closed piece">Close up</button>
+      </div>
+      <span class="note" id="closeInfo"></span>
+    </div>
+  </section>
+
+  <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="whithamBox"><span class="chev" data-glyph="chev"></span>Whitham deformation</button></h2>
     <div class="secbody" id="whithamBox">
       <div id="whithamRow"></div>
       <div class="btnrow"><button class="tbtn" id="toRoot" type="button" title="Move along the family to the critical point of 𝒲, where the differentials have a common root on the unit circle, and put λ₀ there">Flow to common root</button></div>
       <div class="endrow"><span class="lab">Left endpoint</span><span id="endL"></span></div>
       <div class="endrow"><span class="lab">Right endpoint</span><span id="endR"></span></div>
+      <canvas id="tauPad" aria-label="τ, with ψ = Σ logit|α| fixed; drag to move along the leaf" title="Drag to move τ with ψ = Σ logit|α| fixed. The wheel zooms, shift-drag pans, double-click shows all of F₆."></canvas>
+      <p class="note" id="tauPadNote"></p>
       <label class="cb"><input type="checkbox" class="chk" id="showFamily" checked><span>Show the family in the λ-plane</span></label>
       <label class="cb"><input type="checkbox" class="chk" id="whithamDomain" checked><span>Carry the domain along</span></label>
       <p class="note" id="whithamNote"></p>
@@ -272,23 +298,10 @@
   <section class="sec">
     <h2 class="sech"><button class="disc" type="button" aria-expanded="false" aria-controls="tauBox"><span class="chev" data-glyph="chev"></span>Isospectral deformation</button></h2>
     <div class="secbody" id="tauBox" hidden>
+      <div id="centreRows"></div>
       <div id="tauList"></div>
       <label class="cb"><input type="checkbox" class="chk" id="showDivisor"><span>Show the eigenline divisor in the λ-plane</span></label>
       <p class="note" id="tauNote"></p>
-    </div>
-  </section>
-
-  <section class="sec">
-    <h2 class="sech"><button class="disc" type="button" aria-expanded="true" aria-controls="bodyDomain"><span class="chev" data-glyph="chev"></span>Domain in the z-plane</button></h2>
-    <div class="secbody" id="bodyDomain">
-      <div id="domainRows"></div>
-      <label class="cb"><input type="checkbox" class="chk" id="curv" checked><span>Align grid with curvature lines</span></label>
-      <div id="phiRow"></div>
-      <div class="btnrow">
-        <button class="tbtn" id="closeBtn" type="button" title="Find the periods along the grid directions and trim the domain to one closed piece">Close up</button>
-        <button class="tbtn" id="domainReset" type="button" title="Back to the domain of the last preset, link or close-up">Reset domain</button>
-      </div>
-      <span class="note" id="closeInfo"></span>
     </div>
   </section>
 

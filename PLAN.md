@@ -121,13 +121,59 @@ Open:
 
 - **Video export of the τ-Whitham family.** Candidate formats: video (WebM/MP4 via MediaRecorder on the
   canvas), GIF, an SVG animation (SMIL or CSS keyframes over per-frame line drawings), or something else.
-- **Doubly periodic case: τ and the fundamental domain.** Compute the conformal type τ of the lattice Γ
-  and display the F_1, F_3 or F_6 domain.
-- **Projection to the doubly periodic case.** Doubly periodic data are dense in H^g, so "the nearest"
-  isn't well defined. One idea: for the current finite domain in C, give each point a distance to the
-  nearest integer periods; pick the two independent points with the lowest value; step in H^g in the
-  direction that moves those periods towards integral periods. Other schemes are possible, and the
-  choice of distance to the integer points is open to experiment.
+- Done (src/cmc/leaf.js): **the leaf and its frame.** The app keeps a frame (w_1, w_2) of the period plane
+  at the current data (leaf.w): (1, i) where the leaf is entered, or an adapted lattice basis when the plane
+  is rational (always for g = 2; recognised by LLL). The 𝒲 slider and the τ pad move along the leaf and
+  carry the frame; any other edit starts a new leaf.
+- Done: **τ pad** (tau-pad.js) under the 𝒲 slider: τ = w_2/w_1 with psi = sum_j logit|alpha_j| fixed, by
+  square Newton in (alpha, w_1, w_2) with the frame's periods, gauge, τ and psi as equations. F_6 always
+  drawn, its six copies of F_1 labelled by the order of the classes of Λ/2Λ by length. With a lattice
+  basis, τ is reduced into F_6 / F_3 / F_1 on release. (First version held 𝒲 fixed, Q'(0) = 0: see below.)
+- Done: **Doubly periodic section** (period-pad.js): the plane in the w-plane with nearby integer period
+  vectors (a box, plus LLL's vectors as triangles; periods as diamonds), the frame and the domain. Click to lock a period in
+  (PlaneFlow: continuation, min-norm Gauss–Newton in alpha), a second to make the data doubly periodic
+  (saturated lattice, adapted basis, invariants). Verified by shooting: zeta(z + w) = zeta(z) to 1e-10.
+- Open, doubly periodic: edit the domain in the period picture (it is drawn there read-only), e.g. snap
+  its sides to lattice vectors, which would merge with the z-domain controls and with "Close up"; the
+  closing conditions (iv), (v) on top of a locked lattice; the nodes (insert a node with rational nodal
+  B-periods, open it along the leaf: every invariant triple, Remark "bper nodes" of HOS); continuing the
+  τ pad and the τ-flow through a node on S^1 (the paper shows the leaf passes through U^g).
+- Done: the lock flow stops when two branch points come within 1% of |alpha| of each other, and when one
+  step takes over 250 ms (near a collision the period quadrature refines without bound: a genus-5 lock
+  used to spend 5 s per frame there); the note says why it stopped.
+- Why psi and not 𝒲 for the τ pad: the slice 𝒲 = const meets each τ-fibre (an interval) only where 𝒲's
+  narrow, often non-monotone range allows, so the pad soon reached a fibre's end. Measured (genus 2, 14
+  random fibres): psi is strictly monotone on every fibre, from the end at 0 to the end at the circle, so
+  psi = const is a global slice and (τ, psi) global coordinates; holding psi reached targets 0.3–0.8 away
+  where 𝒲 stalled after 0.002–0.16. In genus 3, 4 most fibres end at the circle at both ends and psi
+  turns once (2–4x better than 𝒲, but it still stops, at a fold of the slice).
+- **Future: a better control function for the τ pad** (there might not exist one). Wanted: a function on
+  the leaf that is monotone along every τ-fibre with range all of R, or some other global slice. Candidate
+  for g >= 3: the middle of each fibre, the maximum along the fibre of a barrier
+  B = sum log r_j + sum log(1 - r_j) + sum log|alpha_i - alpha_j| (it tends to -inf at every kind of end,
+  so the maximum exists; uniqueness unknown; the fibre direction comes from the Newton Jacobian). Also:
+  starting near one end of a fibre puts the whole psi-slice near that end.
+- Done: points of the period picture are shaded by the **predicted move** |Δalpha| of one linearised
+  min-norm step of the lock flow (predictMoves: one linearisation of the plane, 2g period evaluations,
+  then a small least-squares problem per point). Measured in genus 3–5: within a few percent of the
+  actual moves; the locks that failed (collision, 0) were predicted at 0.56–0.64, all successes <= 0.38.
+  Points predicted over MOVE_MAX = 0.4 (app.js) are not shown: to be tuned with experience.
+- Open: the τ pad stops at folds; past one needs path-following on the slice (as for the root-preserving
+  pad). The paper's formula for dτ/dt has a sign slip (c_2 b_1 - b_2 c_1 = -aQ).
+- Done: panel order Spectral data, Plane of differentials (was: Doubly periodic), Whitham deformation: all
+  configurations, then a period condition, then the deformations that preserve it. The Domain section is
+  gone: width, height, curvature-line alignment, Close up and Reset domain are in the Plane of
+  differentials; x0, y0 (the translations) in Isospectral deformation. Reset domain became a reset
+  button on each domain slider (and the angle). Open: revisit the behaviour of Align grid and Close up
+  in their new place (e.g. a domain spanned by lattice vectors).
+- Done: **genus 2 τ pad** draws F_3 alone (three copies of F_1), starts on all of F_3, and draws the
+  boundary of S^2 (genus2.js; HOS genus 2 paper): at the nodal end t = t_0(k) with the paper's Re/Im τ,
+  at the open end the real locus of f_0 = i (K - E)/E'. Complete elliptic integrals of complex modulus
+  by the AGM. Checked against the app's periods: nodal end to 7e-10 (so the paper's Re τ integral is
+  right; its TODO doubting the part along the real axis can go); open end to 1e-3 at s = 1e-3 (converging),
+  with real δ_2/δ_1 on the locus. Note for the paper: the open-end τ is τ_0/(1 + τ_0), τ_0 = iK(α)/K(α'),
+  for the basis dual to B_1^+, B_2^+ (the two differentials written down there have periods on B_1^+ and
+  B_1^+ - B_2^+); iK/K' itself is another sheet of F_3 over F_1.
 - General torus search (closing conditions in the UI), and a "close up" that uses the lattice Γ rather
   than the grid axes (so non-rectangular fundamental domains work; for the root-preserving flow, the
   torus lattice at rational phi).
@@ -141,6 +187,19 @@ Open:
   the integration constant on each circle is free, and each circle is a cycle with a possibly nonzero
   period. Going through a branch point (μ = ±1) gives φ modulo periods: an angle mod π when the periods
   are integral (rational plane, integer basis), nothing canonical otherwise. Needs a new normalisation.
+- Done: the differentials b_1, b_2 (for 𝒲 and the arrows in the plane) follow the locked periods: one
+  lock w gives (w, i w); two that are a basis of Λ give themselves (the second negated for orientation if
+  needed); otherwise a locked period primitive in Λ (or the primitive part of the first) and the
+  lattice vector completing it to a basis, with |Re b_2/b_1| <= 1/2 (first version: (w_1, τ w_1), which
+  is not a lattice basis). With a lattice they are a constant real combination A of the adapted
+  basis, which the τ pad keeps, so its τ stays the invariant; 𝒲 scales by det A.
+- **Better handling of branch points near λ = 0.** The open ends of the τ-fibres (all alpha -> 0) are
+  half of the genus-2 picture, but the flows stop at |alpha| = 0.02 (R_MIN in leaf.js, whitham.js), the
+  period quadrature refines without bound there, and the surfaces bubble (u unbounded). Ideas: work in the
+  rescaled coordinate lambda^+ = lambda / t, t = sqrt(alpha_1 alpha_2 ...) of the genus 2 paper (the
+  roots of a^+ stay of size 1, and the differentials rescale by t^{1/2}), so that the open end H^{2+} is
+  a boundary at t = 0 that the flows can reach and the periods stay cheap; then the rescaled surface
+  (the blow-up view below).
 - Blow-up view of the α → 0 corner (Carberry–Klein–Schmidt, arXiv:2110.01574): zoom into one bubble
   and rescale z and f, once the normalisation is settled.
 - Bubbleton presets: the 𝒲 tag shows NaN at a double branch point (show "–" and disable the slider).
